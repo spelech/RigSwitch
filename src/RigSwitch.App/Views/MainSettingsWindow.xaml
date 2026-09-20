@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:RigSwitch.App.ViewModels"
+        xmlns:ctrl="clr-namespace:RigSwitch.App.Controls"
         mc:Ignorable="d"
         Title="RigSwitch Settings"
         Width="740"
@@ -186,7 +187,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Direct Hotkey:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                    <TextBox Grid.Column="1" Text="{Binding DirectHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DirectHotkey, Mode=TwoWay}" Watermark="None (Optional)" />
                 </Grid>
             </StackPanel>
         </DataTemplate>
@@ -384,7 +385,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Toggle Desk / Sim Rig:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <TextBox Grid.Column="1" Text="{Binding ToggleHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding ToggleHotkey, Mode=TwoWay}" />
                                 </Grid>
                                 <Grid Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
@@ -392,7 +393,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Direct Desk Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <TextBox Grid.Column="1" Text="{Binding DeskHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DeskHotkey, Mode=TwoWay}" />
                                 </Grid>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -400,7 +401,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Direct Sim Rig Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <TextBox Grid.Column="1" Text="{Binding RigHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding RigHotkey, Mode=TwoWay}" />
                                 </Grid>
                             </StackPanel>
                         </Border>
