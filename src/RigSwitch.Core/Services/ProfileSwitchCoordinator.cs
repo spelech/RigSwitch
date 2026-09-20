@@ -65,84 +65,78 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     /// <inheritdoc />
     public Task<bool> SwitchToPresetAsync(ProfileMode targetProfile, int presetIndex, CancellationToken cancellationToken = default)
     {
-        SetCurrentPreset(targetProfile, presetIndex);
-        return SwitchProfileAsync(targetProfile, cancellationToken);
+        return SwitchCoreAsync(targetProfile, presetIndex, cancellationToken);
     }
 
     /// <inheritdoc />
     public event EventHandler<ProfileChangedEventArgs>? ProfileChanged;
 
     /// <inheritdoc />
-    public async Task<bool> SwitchProfileAsync(ProfileMode targetProfile, CancellationToken cancellationToken = default)
+    public Task<bool> SwitchProfileAsync(ProfileMode targetProfile, CancellationToken cancellationToken = default)
+    {
+        return SwitchCoreAsync(targetProfile, targetPresetIndex: null, cancellationToken);
+    }
+
+    private async Task<bool> SwitchCoreAsync(ProfileMode targetProfile, int? targetPresetIndex, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         var previousProfile = CurrentProfile;
+        WorkstationPreset? preset = null;
 
         try
         {
-            // Step 2: Load current settings
+            // Step 1: Load current settings and resolve target preset
             var settings = await _settingsStorageService.LoadSettingsAsync(cancellationToken).ConfigureAwait(false);
 
-            var targetMonitorId = targetProfile == ProfileMode.Desk
-                ? settings.DeskMonitorId
-                : settings.RigMonitorId;
+            if (targetPresetIndex.HasValue)
+            {
+                if (targetProfile == ProfileMode.Desk)
+                {
+                    settings.ActiveDeskPresetIndex = targetPresetIndex.Value;
+                }
+                else
+                {
+                    settings.ActiveRigPresetIndex = targetPresetIndex.Value;
+                }
+            }
 
-            var inactiveMonitorId = targetProfile == ProfileMode.Desk
-                ? settings.RigMonitorId
-                : settings.DeskMonitorId;
+            preset = settings.GetActivePreset(targetProfile);
+            var activePresetIndex = targetProfile == ProfileMode.Desk
+                ? settings.ActiveDeskPresetIndex
+                : settings.ActiveRigPresetIndex;
 
-            // Step 3: Safety Gate (Reachability Verification)
-            if (string.IsNullOrWhiteSpace(targetMonitorId))
+            var inactiveProfile = targetProfile == ProfileMode.Desk
+                ? ProfileMode.SimRig
+                : ProfileMode.Desk;
+            var inactivePreset = settings.GetActivePreset(inactiveProfile);
+            var inactiveMonitorId = inactivePreset.TargetMonitorId;
+
+            // Step 2: Safety Gate (Reachability Verification)
+            if (string.IsNullOrWhiteSpace(preset.TargetMonitorId))
             {
                 var errorMsg = $"No target display configured for profile '{targetProfile}'. Please select your display in Settings.";
-                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, success: false, errorMessage: errorMsg));
+                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, activePreset: preset, success: false, errorMessage: errorMsg));
                 return false;
             }
 
             var displays = await _displayConfigService.EnumerateDisplaysAsync(cancellationToken).ConfigureAwait(false);
-            var isTargetPresent = IsDisplayConnected(targetMonitorId, displays);
+            var isTargetPresent = IsDisplayConnected(preset.TargetMonitorId, displays);
 
             if (!isTargetPresent)
             {
-                var errorMsg = $"Target monitor '{targetMonitorId}' for profile '{targetProfile}' was not found among connected displays.";
-                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, success: false, errorMessage: errorMsg));
+                var errorMsg = $"Target monitor '{preset.TargetMonitorId}' for profile '{targetProfile}' was not found among connected displays.";
+                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, activePreset: preset, success: false, errorMessage: errorMsg));
                 return false;
             }
 
-            // Step 4: Apply Display Topology
-            await _displayConfigService.ApplySingleDisplayTopologyAsync(targetMonitorId, inactiveMonitorId, cancellationToken).ConfigureAwait(false);
+            // Step 3: Apply Display Topology
+            await _displayConfigService.ApplySingleDisplayTopologyAsync(preset.TargetMonitorId, inactiveMonitorId, cancellationToken).ConfigureAwait(false);
 
-            // Step 5: Multi-tier Audio Resolution & Routing
+            // Step 4: Multi-tier Audio Resolution & Routing
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
-            string resolvedAudioId;
-
-            if (targetProfile == ProfileMode.Desk)
-            {
-                var primaryMatch = endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.DeskPrimaryAudioId) && e.State == DevicePresenceState.Active);
-                var fallbackMatch = endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.DeskFallbackAudioId) && e.State == DevicePresenceState.Active);
-
-                if (!string.IsNullOrWhiteSpace(settings.DeskPrimaryAudioId) && primaryMatch != null)
-                {
-                    resolvedAudioId = primaryMatch.Id;
-                }
-                else if (!string.IsNullOrWhiteSpace(settings.DeskFallbackAudioId) && fallbackMatch != null)
-                {
-                    resolvedAudioId = fallbackMatch.Id;
-                }
-                else
-                {
-                    var firstActive = endpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active);
-                    resolvedAudioId = firstActive?.Id ??
-                        (endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.DeskPrimaryAudioId))?.Id ?? settings.DeskPrimaryAudioId);
-                }
-            }
-            else
-            {
-                var rigMatch = endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.RigPrimaryAudioId));
-                resolvedAudioId = rigMatch?.Id ?? settings.RigPrimaryAudioId;
-            }
+            var resolvedAudioId = ResolveAudioEndpoint(preset.PrimaryAudioId, preset.FallbackAudioId, endpoints);
 
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
             {
@@ -165,12 +159,14 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                 }
             }
 
-            // Step 6: State & Settings Persistence
+            // Step 5: State & Settings Persistence
             CurrentProfile = targetProfile;
+            CurrentPresetIndex = activePresetIndex;
+            CurrentPreset = preset;
             settings.LastActiveProfile = targetProfile;
             await _settingsStorageService.SaveSettingsAsync(settings, cancellationToken).ConfigureAwait(false);
 
-            ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, success: true));
+            ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, activePreset: preset, success: true));
             return true;
         }
         catch (OperationCanceledException)
@@ -179,13 +175,48 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         }
         catch (Exception ex)
         {
-            ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, success: false, errorMessage: ex.Message));
+            ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, activePreset: preset, success: false, errorMessage: ex.Message));
             return false;
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    private static string? ResolveAudioEndpoint(
+        string? primaryAudioId,
+        string? fallbackAudioId,
+        IEnumerable<AudioEndpointInfo> endpoints)
+    {
+        if (string.IsNullOrWhiteSpace(primaryAudioId) && string.IsNullOrWhiteSpace(fallbackAudioId))
+        {
+            return null;
+        }
+
+        var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
+        var primaryMatch = endpointList.FirstOrDefault(e => MatchesEndpoint(e.Id, primaryAudioId) && e.State == DevicePresenceState.Active);
+        var fallbackMatch = endpointList.FirstOrDefault(e => MatchesEndpoint(e.Id, fallbackAudioId) && e.State == DevicePresenceState.Active);
+
+        if (!string.IsNullOrWhiteSpace(primaryAudioId) && primaryMatch != null)
+        {
+            return primaryMatch.Id;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fallbackAudioId) && fallbackMatch != null)
+        {
+            return fallbackMatch.Id;
+        }
+
+        var firstActive = endpointList.FirstOrDefault(e => e.State == DevicePresenceState.Active);
+        if (firstActive != null)
+        {
+            return firstActive.Id;
+        }
+
+        var targetId = !string.IsNullOrWhiteSpace(primaryAudioId) ? primaryAudioId : fallbackAudioId;
+        var directMatch = endpointList.FirstOrDefault(e => MatchesEndpoint(e.Id, targetId));
+        return directMatch?.Id ?? targetId;
     }
 
     private static bool IsDisplayConnected(string targetMonitorId, IEnumerable<DisplayDeviceInfo> displays)
