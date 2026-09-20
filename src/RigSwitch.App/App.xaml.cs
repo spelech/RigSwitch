@@ -103,7 +103,7 @@ public partial class App : Application
     }
 
     /// <inheritdoc/>
-    protected override async void OnExit(ExitEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
         if (_mainWindow != null)
         {
@@ -116,11 +116,8 @@ public partial class App : Application
 
         _trayIconService?.Dispose();
 
-        if (_host != null)
-        {
-            await _host.StopAsync();
-            _host.Dispose();
-        }
+        _host?.StopAsync().GetAwaiter().GetResult();
+        _host?.Dispose();
 
         base.OnExit(e);
     }

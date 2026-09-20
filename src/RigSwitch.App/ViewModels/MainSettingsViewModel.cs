@@ -36,32 +36,13 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
     private string _rigHotkey = "Ctrl+Alt+R";
     private bool _startMinimizedToTray = true;
     private bool _showToastNotifications = true;
-
     private bool _disposed;
 
-    /// <summary>
-    /// Gets the detected connected displays.
-    /// </summary>
     public ObservableCollection<DisplayDeviceInfo> DetectedDisplays { get; } = [];
-
-    /// <summary>
-    /// Gets the detected audio playback endpoints.
-    /// </summary>
     public ObservableCollection<AudioEndpointInfo> DetectedAudioEndpoints { get; } = [];
-
-    /// <summary>
-    /// Gets the list of device renamer items.
-    /// </summary>
     public ObservableCollection<DeviceNicknameItemViewModel> DeviceNicknames { get; } = [];
-
-    /// <summary>
-    /// Gets the collection of audio endpoints with visibility toggles.
-    /// </summary>
     public ObservableCollection<AudioEndpointVisibilityItemViewModel> AudioEndpointsVisibility { get; } = [];
 
-    /// <summary>
-    /// Gets the currently active workstation profile.
-    /// </summary>
     public ProfileMode CurrentProfile
     {
         get => _currentProfile;
@@ -76,152 +57,31 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// Gets the user-facing badge text for the active profile.
-    /// </summary>
     public string CurrentProfileBadgeText => CurrentProfile == ProfileMode.Desk ? "🖥️ Desk Setup" : "🏎️ Sim Rig Setup";
-
-    /// <summary>
-    /// Gets a value indicating whether the Desk profile is active.
-    /// </summary>
     public bool IsDeskActive => CurrentProfile == ProfileMode.Desk;
-
-    /// <summary>
-    /// Gets a value indicating whether the Sim Rig profile is active.
-    /// </summary>
     public bool IsRigActive => CurrentProfile == ProfileMode.SimRig;
 
-    /// <summary>
-    /// Gets or sets a value indicating whether an asynchronous operation is in progress.
-    /// </summary>
-    public bool IsBusy
-    {
-        get => _isBusy;
-        set => SetProperty(ref _isBusy, value);
-    }
+    public bool IsBusy { get => _isBusy; set => SetProperty(ref _isBusy, value); }
+    public string StatusMessage { get => _statusMessage; set => SetProperty(ref _statusMessage, value); }
 
-    /// <summary>
-    /// Gets or sets user-facing status feedback.
-    /// </summary>
-    public string StatusMessage
-    {
-        get => _statusMessage;
-        set => SetProperty(ref _statusMessage, value);
-    }
+    public string DeskMonitorId { get => _deskMonitorId; set => SetProperty(ref _deskMonitorId, value); }
+    public string RigMonitorId { get => _rigMonitorId; set => SetProperty(ref _rigMonitorId, value); }
+    public string DeskPrimaryAudioId { get => _deskPrimaryAudioId; set => SetProperty(ref _deskPrimaryAudioId, value); }
+    public string DeskFallbackAudioId { get => _deskFallbackAudioId; set => SetProperty(ref _deskFallbackAudioId, value); }
+    public string RigPrimaryAudioId { get => _rigPrimaryAudioId; set => SetProperty(ref _rigPrimaryAudioId, value); }
 
-    /// <summary>
-    /// Gets or sets the target monitor ID for Desk setup.
-    /// </summary>
-    public string DeskMonitorId
-    {
-        get => _deskMonitorId;
-        set => SetProperty(ref _deskMonitorId, value);
-    }
+    public string ToggleHotkey { get => _toggleHotkey; set => SetProperty(ref _toggleHotkey, value); }
+    public string DeskHotkey { get => _deskHotkey; set => SetProperty(ref _deskHotkey, value); }
+    public string RigHotkey { get => _rigHotkey; set => SetProperty(ref _rigHotkey, value); }
 
-    /// <summary>
-    /// Gets or sets the target monitor ID for Sim Rig setup.
-    /// </summary>
-    public string RigMonitorId
-    {
-        get => _rigMonitorId;
-        set => SetProperty(ref _rigMonitorId, value);
-    }
+    public bool StartMinimizedToTray { get => _startMinimizedToTray; set => SetProperty(ref _startMinimizedToTray, value); }
+    public bool ShowToastNotifications { get => _showToastNotifications; set => SetProperty(ref _showToastNotifications, value); }
 
-    /// <summary>
-    /// Gets or sets the primary audio endpoint GUID for Desk setup.
-    /// </summary>
-    public string DeskPrimaryAudioId
-    {
-        get => _deskPrimaryAudioId;
-        set => SetProperty(ref _deskPrimaryAudioId, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the fallback audio endpoint GUID for Desk setup.
-    /// </summary>
-    public string DeskFallbackAudioId
-    {
-        get => _deskFallbackAudioId;
-        set => SetProperty(ref _deskFallbackAudioId, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the primary audio endpoint GUID for Sim Rig setup.
-    /// </summary>
-    public string RigPrimaryAudioId
-    {
-        get => _rigPrimaryAudioId;
-        set => SetProperty(ref _rigPrimaryAudioId, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the toggle profiles hotkey string.
-    /// </summary>
-    public string ToggleHotkey
-    {
-        get => _toggleHotkey;
-        set => SetProperty(ref _toggleHotkey, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the direct Desk profile hotkey string.
-    /// </summary>
-    public string DeskHotkey
-    {
-        get => _deskHotkey;
-        set => SetProperty(ref _deskHotkey, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the direct Sim Rig profile hotkey string.
-    /// </summary>
-    public string RigHotkey
-    {
-        get => _rigHotkey;
-        set => SetProperty(ref _rigHotkey, value);
-    }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the app starts minimized to the system tray.
-    /// </summary>
-    public bool StartMinimizedToTray
-    {
-        get => _startMinimizedToTray;
-        set => SetProperty(ref _startMinimizedToTray, value);
-    }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether balloon notifications are shown.
-    /// </summary>
-    public bool ShowToastNotifications
-    {
-        get => _showToastNotifications;
-        set => SetProperty(ref _showToastNotifications, value);
-    }
-
-    /// <summary>
-    /// Command to switch workstation to Desk profile.
-    /// </summary>
     public ICommand SwitchToDeskCommand { get; }
-
-    /// <summary>
-    /// Command to switch workstation to Sim Rig profile.
-    /// </summary>
     public ICommand SwitchToRigCommand { get; }
-
-    /// <summary>
-    /// Command to save user configuration.
-    /// </summary>
     public ICommand SaveSettingsCommand { get; }
-
-    /// <summary>
-    /// Command to refresh connected devices.
-    /// </summary>
     public ICommand RefreshDevicesCommand { get; }
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MainSettingsViewModel"/> class.
-    /// </summary>
     public MainSettingsViewModel(
         IProfileSwitchCoordinator coordinator,
         ISettingsStorageService settingsStorage,
@@ -247,26 +107,12 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         _currentProfile = _coordinator.CurrentProfile;
         _coordinator.ProfileChanged += OnProfileChanged;
 
-        SwitchToDeskCommand = new AsyncRelayCommand(
-            () => SwitchProfileAsync(ProfileMode.Desk),
-            () => !IsBusy);
-
-        SwitchToRigCommand = new AsyncRelayCommand(
-            () => SwitchProfileAsync(ProfileMode.SimRig),
-            () => !IsBusy);
-
-        SaveSettingsCommand = new AsyncRelayCommand(
-            SaveSettingsAsync,
-            () => !IsBusy);
-
-        RefreshDevicesCommand = new AsyncRelayCommand(
-            () => LoadAsync(),
-            () => !IsBusy);
+        SwitchToDeskCommand = new AsyncRelayCommand(() => SwitchProfileAsync(ProfileMode.Desk), () => !IsBusy);
+        SwitchToRigCommand = new AsyncRelayCommand(() => SwitchProfileAsync(ProfileMode.SimRig), () => !IsBusy);
+        SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync, () => !IsBusy);
+        RefreshDevicesCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsBusy);
     }
 
-    /// <summary>
-    /// Loads settings and detects displays and audio endpoints asynchronously.
-    /// </summary>
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         IsBusy = true;
@@ -340,9 +186,6 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// Switches workstation profile asynchronously.
-    /// </summary>
     public async Task SwitchProfileAsync(ProfileMode targetProfile)
     {
         IsBusy = true;
@@ -350,14 +193,9 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         try
         {
             bool success = await _coordinator.SwitchProfileAsync(targetProfile);
-            if (success)
-            {
-                StatusMessage = $"Successfully switched to {targetProfile} profile.";
-            }
-            else
-            {
-                StatusMessage = $"Failed to switch to {targetProfile} profile.";
-            }
+            StatusMessage = success
+                ? $"Successfully switched to {targetProfile} profile."
+                : $"Failed to switch to {targetProfile} profile.";
         }
         catch (Exception ex)
         {
@@ -369,9 +207,6 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// Persists current view model settings to disk and updates hotkeys.
-    /// </summary>
     public async Task SaveSettingsAsync()
     {
         IsBusy = true;
@@ -391,12 +226,15 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
             settings.StartMinimizedToTray = StartMinimizedToTray;
             settings.ShowToastNotifications = ShowToastNotifications;
 
-            settings.CustomDeviceNames.Clear();
             foreach (var nickItem in DeviceNicknames)
             {
                 if (!string.IsNullOrWhiteSpace(nickItem.CustomNickname))
                 {
                     settings.CustomDeviceNames[nickItem.DeviceId] = nickItem.CustomNickname.Trim();
+                }
+                else
+                {
+                    settings.CustomDeviceNames.Remove(nickItem.DeviceId);
                 }
             }
 
@@ -406,7 +244,11 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
             RegisterGlobalHotkeys(settings);
             _trayIconService.ShowToastNotifications = settings.ShowToastNotifications;
 
-            StatusMessage = "Settings saved successfully!";
+            if (string.IsNullOrEmpty(StatusMessage) || !StatusMessage.StartsWith("Warning:", StringComparison.Ordinal))
+            {
+                StatusMessage = "Settings saved successfully!";
+            }
+
             _trayIconService.ShowNotification("RigSwitch", "Settings saved successfully.");
         }
         catch (Exception ex)
@@ -419,40 +261,58 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// Registers configured hotkey bindings into the global hotkey service.
-    /// </summary>
     public void RegisterGlobalHotkeys(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
         _hotkeyService.UnregisterAll();
+        var failedHotkeys = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(settings.ToggleHotkey))
         {
-            _hotkeyService.RegisterHotkey(settings.ToggleHotkey, () =>
+            bool registered = _hotkeyService.RegisterHotkey(settings.ToggleHotkey, () =>
             {
                 var nextProfile = _coordinator.CurrentProfile == ProfileMode.Desk
                     ? ProfileMode.SimRig
                     : ProfileMode.Desk;
                 _ = _coordinator.SwitchProfileAsync(nextProfile);
             });
+
+            if (!registered)
+            {
+                failedHotkeys.Add(settings.ToggleHotkey);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(settings.DeskHotkey))
         {
-            _hotkeyService.RegisterHotkey(settings.DeskHotkey, () =>
+            bool registered = _hotkeyService.RegisterHotkey(settings.DeskHotkey, () =>
             {
                 _ = _coordinator.SwitchProfileAsync(ProfileMode.Desk);
             });
+
+            if (!registered)
+            {
+                failedHotkeys.Add(settings.DeskHotkey);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(settings.RigHotkey))
         {
-            _hotkeyService.RegisterHotkey(settings.RigHotkey, () =>
+            bool registered = _hotkeyService.RegisterHotkey(settings.RigHotkey, () =>
             {
                 _ = _coordinator.SwitchProfileAsync(ProfileMode.SimRig);
             });
+
+            if (!registered)
+            {
+                failedHotkeys.Add(settings.RigHotkey);
+            }
+        }
+
+        if (failedHotkeys.Count > 0)
+        {
+            StatusMessage = $"Warning: Failed to register hotkey(s): {string.Join(", ", failedHotkeys)}";
         }
     }
 
@@ -483,6 +343,7 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
+            item.RevertVisibility(!isVisible);
             StatusMessage = $"Failed to update visibility for {item.Name}: {ex.Message}";
         }
     }
@@ -495,7 +356,6 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
         });
     }
 
-    /// <inheritdoc/>
     public void Dispose()
     {
         if (_disposed)

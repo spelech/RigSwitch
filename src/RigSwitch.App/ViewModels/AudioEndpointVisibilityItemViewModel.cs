@@ -42,6 +42,16 @@ public sealed class AudioEndpointVisibilityItemViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Reverts the visibility state without re-triggering the visibility changed callback.
+    /// </summary>
+    /// <param name="previousState">The previous visibility state to restore.</param>
+    public void RevertVisibility(bool previousState)
+    {
+        _isVisible = previousState;
+        OnPropertyChanged(nameof(IsVisible));
+    }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="AudioEndpointVisibilityItemViewModel"/> class.
     /// </summary>
     /// <param name="id">The MMDevice endpoint GUID identifier.</param>
