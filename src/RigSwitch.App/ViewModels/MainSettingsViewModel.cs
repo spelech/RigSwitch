@@ -230,7 +230,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
             DetectedAudioEndpoints.Clear();
-            foreach (var a in audioEndpoints)
+            foreach (var a in audioEndpoints.Where(x => x.State == RigSwitch.Core.Enums.DevicePresenceState.Active))
             {
                 DetectedAudioEndpoints.Add(a);
             }
@@ -248,12 +248,11 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             AvailableAudioOptions.Clear();
             AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
-            foreach (var a in audioEndpoints)
+            foreach (var a in audioEndpoints.Where(x => x.State == RigSwitch.Core.Enums.DevicePresenceState.Active))
             {
                 string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
                 var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
-                var stateTag = a.State == RigSwitch.Core.Enums.DevicePresenceState.Active ? "" : $" [{a.State}]";
-                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, $"{name}{stateTag}"));
+                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
             }
 
             DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions);
