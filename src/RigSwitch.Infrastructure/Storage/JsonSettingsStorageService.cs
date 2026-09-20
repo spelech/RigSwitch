@@ -72,7 +72,9 @@ public sealed class JsonSettingsStorageService : ISettingsStorageService, IDispo
                     _serializerOptions,
                     cancellationToken).ConfigureAwait(false);
 
-                return loadedSettings ?? new UserSettings();
+                var settings = loadedSettings ?? new UserSettings();
+                EnsurePresetsConfigured(settings);
+                return settings;
             }
             catch (JsonException ex)
             {
@@ -150,6 +152,40 @@ public sealed class JsonSettingsStorageService : ISettingsStorageService, IDispo
         finally
         {
             _semaphore.Release();
+        }
+    }
+
+    private static void EnsurePresetsConfigured(UserSettings settings)
+    {
+        if (settings.DeskPresets == null || settings.DeskPresets.Count == 0)
+        {
+            settings.DeskPresets =
+            [
+                new()
+                {
+                    Name = "Work / Primary",
+                    TargetMonitorId = settings.DeskMonitorId,
+                    PrimaryAudioId = settings.DeskPrimaryAudioId,
+                    FallbackAudioId = settings.DeskFallbackAudioId
+                },
+                new() { Name = "Media / Casual" },
+                new() { Name = "Clean Desk" }
+            ];
+        }
+
+        if (settings.RigPresets == null || settings.RigPresets.Count == 0)
+        {
+            settings.RigPresets =
+            [
+                new()
+                {
+                    Name = "GT3 / Circuit",
+                    TargetMonitorId = settings.RigMonitorId,
+                    PrimaryAudioId = settings.RigPrimaryAudioId
+                },
+                new() { Name = "Rally / Drift" },
+                new() { Name = "Flight / Space" }
+            ];
         }
     }
 

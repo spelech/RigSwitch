@@ -220,4 +220,91 @@ public sealed class JsonSettingsStorageServiceTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.SaveSettingsAsync(new UserSettings(), cts.Token));
     }
+
+    [Fact]
+    public async Task LoadSettingsAsync_WhenLegacyJsonWithoutPresets_AutoMigratesToThreePresetsWithLegacyValuesInPresetZero()
+    {
+        // Arrange
+        var settingsPath = Path.Combine(_testDirectory, "legacy_settings.json");
+        var legacyJson = """
+        {
+            "LastActiveProfile": 1,
+            "DeskMonitorId": "LEGACY_DESK_MONITOR",
+            "RigMonitorId": "LEGACY_RIG_MONITOR",
+            "DeskPrimaryAudioId": "LEGACY_DESK_AUDIO",
+            "DeskFallbackAudioId": "LEGACY_FALLBACK_AUDIO",
+            "RigPrimaryAudioId": "LEGACY_RIG_AUDIO",
+            "ToggleHotkey": "Ctrl+Shift+T"
+        }
+        """;
+        await File.WriteAllTextAsync(settingsPath, legacyJson);
+        var service = new JsonSettingsStorageService(settingsPath);
+
+        // Act
+        var loaded = await service.LoadSettingsAsync();
+
+        // Assert
+        Assert.NotNull(loaded);
+        Assert.Equal(ProfileMode.SimRig, loaded.LastActiveProfile);
+        Assert.Equal("Ctrl+Shift+T", loaded.ToggleHotkey);
+
+        // Desk presets populated and legacy values mapped to preset 0
+        Assert.NotNull(loaded.DeskPresets);
+        Assert.Equal(3, loaded.DeskPresets.Count);
+        Assert.Equal("Work / Primary", loaded.DeskPresets[0].Name);
+        Assert.Equal("LEGACY_DESK_MONITOR", loaded.DeskPresets[0].TargetMonitorId);
+        Assert.Equal("LEGACY_DESK_AUDIO", loaded.DeskPresets[0].PrimaryAudioId);
+        Assert.Equal("LEGACY_FALLBACK_AUDIO", loaded.DeskPresets[0].FallbackAudioId);
+        Assert.Equal("Media / Casual", loaded.DeskPresets[1].Name);
+        Assert.Equal("Clean Desk", loaded.DeskPresets[2].Name);
+
+        // Rig presets populated and legacy values mapped to preset 0
+        Assert.NotNull(loaded.RigPresets);
+        Assert.Equal(3, loaded.RigPresets.Count);
+        Assert.Equal("GT3 / Circuit", loaded.RigPresets[0].Name);
+        Assert.Equal("LEGACY_RIG_MONITOR", loaded.RigPresets[0].TargetMonitorId);
+        Assert.Equal("LEGACY_RIG_AUDIO", loaded.RigPresets[0].PrimaryAudioId);
+        Assert.Equal("Rally / Drift", loaded.RigPresets[1].Name);
+        Assert.Equal("Flight / Space", loaded.RigPresets[2].Name);
+
+        // Backward compatibility properties redirect correctly
+        Assert.Equal("LEGACY_DESK_MONITOR", loaded.DeskMonitorId);
+        Assert.Equal("LEGACY_RIG_MONITOR", loaded.RigMonitorId);
+        Assert.Equal("LEGACY_DESK_AUDIO", loaded.DeskPrimaryAudioId);
+        Assert.Equal("LEGACY_FALLBACK_AUDIO", loaded.DeskFallbackAudioId);
+        Assert.Equal("LEGACY_RIG_AUDIO", loaded.RigPrimaryAudioId);
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_WhenLegacyJsonWithEmptyOrNullPresets_PopulatesThreeDefaultsAndCopiesLegacyValues()
+    {
+        // Arrange
+        var settingsPath = Path.Combine(_testDirectory, "empty_presets_settings.json");
+        var legacyJson = """
+        {
+            "DeskMonitorId": "EXPLICIT_DESK_MON",
+            "RigMonitorId": "EXPLICIT_RIG_MON",
+            "DeskPrimaryAudioId": "EXPLICIT_DESK_AUD",
+            "DeskFallbackAudioId": "EXPLICIT_FALLBACK",
+            "RigPrimaryAudioId": "EXPLICIT_RIG_AUD",
+            "DeskPresets": [],
+            "RigPresets": null
+        }
+        """;
+        await File.WriteAllTextAsync(settingsPath, legacyJson);
+        var service = new JsonSettingsStorageService(settingsPath);
+
+        // Act
+        var loaded = await service.LoadSettingsAsync();
+
+        // Assert
+        Assert.NotNull(loaded);
+        Assert.Equal(3, loaded.DeskPresets.Count);
+        Assert.Equal(3, loaded.RigPresets.Count);
+        Assert.Equal("EXPLICIT_DESK_MON", loaded.DeskPresets[0].TargetMonitorId);
+        Assert.Equal("EXPLICIT_RIG_MON", loaded.RigPresets[0].TargetMonitorId);
+        Assert.Equal("EXPLICIT_DESK_AUD", loaded.DeskPresets[0].PrimaryAudioId);
+        Assert.Equal("EXPLICIT_FALLBACK", loaded.DeskPresets[0].FallbackAudioId);
+        Assert.Equal("EXPLICIT_RIG_AUD", loaded.RigPresets[0].PrimaryAudioId);
+    }
 }

@@ -342,4 +342,128 @@ public sealed class ProfileSwitchCoordinatorTests
         await Assert.ThrowsAsync<ObjectDisposedException>(
             () => coordinator.SwitchProfileAsync(ProfileMode.SimRig));
     }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_WithinSameEnvironmentMode_SwitchesPresetAndPersistsIndex()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryAudioId = DeskPrimaryAudioId;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+        ProfileChangedEventArgs? received = null;
+        coordinator.ProfileChanged += (_, e) => received = e;
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
+        Assert.Equal(1, coordinator.CurrentPresetIndex);
+        Assert.Equal(_defaultSettings.DeskPresets[1], coordinator.CurrentPreset);
+        Assert.NotNull(received);
+        Assert.Equal(_defaultSettings.DeskPresets[1], received.ActivePreset);
+        await _settingsService.Received(1).SaveSettingsAsync(
+            Arg.Is<UserSettings>(s => s.ActiveDeskPresetIndex == 1 && s.LastActiveProfile == ProfileMode.Desk),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_ToOppositeEnvironmentMode_SwitchesProfileAndPreset()
+    {
+        // Arrange
+        _defaultSettings.RigPresets[2].TargetMonitorId = RigMonitorId;
+        _defaultSettings.RigPresets[2].PrimaryAudioId = RigPrimaryAudioId;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+        ProfileChangedEventArgs? received = null;
+        coordinator.ProfileChanged += (_, e) => received = e;
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.SimRig, 2);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(ProfileMode.SimRig, coordinator.CurrentProfile);
+        Assert.Equal(2, coordinator.CurrentPresetIndex);
+        Assert.Equal(_defaultSettings.RigPresets[2], coordinator.CurrentPreset);
+        Assert.NotNull(received);
+        Assert.Equal(ProfileMode.Desk, received.PreviousProfile);
+        Assert.Equal(ProfileMode.SimRig, received.NewProfile);
+        Assert.Equal(_defaultSettings.RigPresets[2], received.ActivePreset);
+        await _settingsService.Received(1).SaveSettingsAsync(
+            Arg.Is<UserSettings>(s => s.ActiveRigPresetIndex == 2 && s.LastActiveProfile == ProfileMode.SimRig),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_WhenTargetMonitorEmptyOrDisconnected_HaltsAtSafetyGate()
+    {
+        // Arrange 1: Empty monitor ID
+        _defaultSettings.DeskPresets[1].TargetMonitorId = string.Empty;
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+        ProfileChangedEventArgs? emptyEvent = null;
+        coordinator.ProfileChanged += (_, e) => emptyEvent = e;
+
+        var emptyResult = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        Assert.False(emptyResult);
+        Assert.False(emptyEvent!.Success);
+        Assert.Contains("No target display configured", emptyEvent.ErrorMessage);
+
+        // Arrange 2: Disconnected monitor ID
+        _defaultSettings.DeskPresets[2].TargetMonitorId = "DISCONNECTED_DISP";
+        ProfileChangedEventArgs? missingEvent = null;
+        coordinator.ProfileChanged += (_, e) => missingEvent = e;
+
+        var missingResult = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 2);
+
+        Assert.False(missingResult);
+        Assert.False(missingEvent!.Success);
+        Assert.Contains("DISCONNECTED_DISP", missingEvent.ErrorMessage);
+        await _settingsService.DidNotReceiveWithAnyArgs().SaveSettingsAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_AudioRouting_UsesPresetPrimaryAndFallbackAudioEndpoints()
+    {
+        // Arrange
+        const string customPrimary = "{CUSTOM-PRIMARY-GUID}";
+        const string customFallback = "{CUSTOM-FALLBACK-GUID}";
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryAudioId = customPrimary;
+        _defaultSettings.DeskPresets[1].FallbackAudioId = customFallback;
+
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new AudioEndpointInfo(customPrimary, "Primary Mic/Spk", "Audio", DevicePresenceState.Unplugged, false, false),
+                new AudioEndpointInfo(customFallback, "Fallback Spk", "Audio", DevicePresenceState.Active, false, false)
+            ]);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync(customFallback, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void SetCurrentPreset_SyncsStateWithoutHardwareSwitch()
+    {
+        // Arrange
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        coordinator.SetCurrentPreset(ProfileMode.SimRig, 2);
+
+        // Assert
+        Assert.Equal(ProfileMode.SimRig, coordinator.CurrentProfile);
+        Assert.Equal(2, coordinator.CurrentPresetIndex);
+        _displayService.DidNotReceiveWithAnyArgs().ApplySingleDisplayTopologyAsync(default!, default, default);
+        _audioDirector.DidNotReceiveWithAnyArgs().SetDefaultPlaybackEndpointAsync(default!, default);
+    }
 }
