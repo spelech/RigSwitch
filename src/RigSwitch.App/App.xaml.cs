@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using RigSwitch.App.Services;
 using RigSwitch.App.ViewModels;
 using RigSwitch.App.Views;
+using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Services;
 using RigSwitch.Infrastructure.Storage;
@@ -28,61 +29,106 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        ShutdownMode = ShutdownMode.OnExplicitShutdown;
-
-        var builder = Host.CreateApplicationBuilder(e.Args);
-
-        builder.Services.AddSingleton<ISettingsStorageService>(_ => new JsonSettingsStorageService());
-        builder.Services.AddSingleton<IDisplayConfigurationService>(_ => new WindowsDisplayConfigurationService());
-        builder.Services.AddSingleton<IAudioEndpointDirector>(_ => new CoreAudioEndpointDirector());
-        builder.Services.AddSingleton<IGlobalHotkeyService>(_ => new WindowsGlobalHotkeyService());
-        builder.Services.AddSingleton<IProfileSwitchCoordinator>(sp =>
-            new ProfileSwitchCoordinator(
-                sp.GetRequiredService<IDisplayConfigurationService>(),
-                sp.GetRequiredService<IAudioEndpointDirector>(),
-                sp.GetRequiredService<ISettingsStorageService>()));
-
-        builder.Services.AddSingleton<TrayIconService>();
-        builder.Services.AddSingleton<MainSettingsViewModel>();
-        builder.Services.AddSingleton<MainSettingsWindow>();
-
-        _host = builder.Build();
-        await _host.StartAsync();
-
-        var settingsStorage = _host.Services.GetRequiredService<ISettingsStorageService>();
-        var coordinator = _host.Services.GetRequiredService<IProfileSwitchCoordinator>();
-        var viewModel = _host.Services.GetRequiredService<MainSettingsViewModel>();
-        _mainWindow = _host.Services.GetRequiredService<MainSettingsWindow>();
-        _trayIconService = _host.Services.GetRequiredService<TrayIconService>();
-
-        _trayIconService.Initialize(ShowSettingsWindow);
-
-        var settings = await settingsStorage.LoadSettingsAsync();
-        _trayIconService.ShowToastNotifications = settings.ShowToastNotifications;
-        _trayIconService.UpdateTrayState(coordinator.CurrentProfile);
-
-        viewModel.RegisterGlobalHotkeys(settings);
-
-        coordinator.ProfileChanged += (sender, args) =>
+        try
         {
-            Dispatcher.Invoke(() =>
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            var builder = Host.CreateApplicationBuilder(e.Args);
+
+            builder.Services.AddSingleton<ISettingsStorageService>(_ => new JsonSettingsStorageService());
+            builder.Services.AddSingleton<IDisplayConfigurationService>(_ => new WindowsDisplayConfigurationService());
+            builder.Services.AddSingleton<IAudioEndpointDirector>(_ => new CoreAudioEndpointDirector());
+            builder.Services.AddSingleton<IGlobalHotkeyService>(_ => new WindowsGlobalHotkeyService());
+            builder.Services.AddSingleton<IProfileSwitchCoordinator>(sp =>
+                new ProfileSwitchCoordinator(
+                    sp.GetRequiredService<IDisplayConfigurationService>(),
+                    sp.GetRequiredService<IAudioEndpointDirector>(),
+                    sp.GetRequiredService<ISettingsStorageService>()));
+
+            builder.Services.AddSingleton<TrayIconService>();
+            builder.Services.AddSingleton<MainSettingsViewModel>();
+            builder.Services.AddSingleton<MainSettingsWindow>();
+
+            _host = builder.Build();
+            await _host.StartAsync();
+
+            var settingsStorage = _host.Services.GetRequiredService<ISettingsStorageService>();
+            var coordinator = _host.Services.GetRequiredService<IProfileSwitchCoordinator>();
+            var viewModel = _host.Services.GetRequiredService<MainSettingsViewModel>();
+            _mainWindow = _host.Services.GetRequiredService<MainSettingsWindow>();
+            _trayIconService = _host.Services.GetRequiredService<TrayIconService>();
+
+            _trayIconService.Initialize(ShowSettingsWindow);
+
+            var settings = await settingsStorage.LoadSettingsAsync();
+            _trayIconService.ShowToastNotifications = settings.ShowToastNotifications;
+
+            // Synchronize profile on startup: detect active display or fallback to LastActiveProfile
+            var activeProfile = settings.LastActiveProfile;
+            try
             {
-                if (args.Success)
-                {
-                    _trayIconService.UpdateTrayState(args.NewProfile);
-                    _trayIconService.ShowNotification("RigSwitch", $"Switched to {args.NewProfile} setup.");
-                }
-                else
-                {
-                    _trayIconService.ShowNotification("RigSwitch Error", args.ErrorMessage ?? $"Failed to switch to {args.NewProfile}.");
-                }
-            });
-        };
+                var displayService = _host.Services.GetRequiredService<IDisplayConfigurationService>();
+                var displays = await displayService.EnumerateDisplaysAsync();
+                var activeDisplay = displays.FirstOrDefault(d => d.IsActive && d.IsPrimary)
+                    ?? displays.FirstOrDefault(d => d.IsActive);
 
-        bool startMinimized = settings.StartMinimizedToTray;
-        if (!startMinimized)
+                if (activeDisplay != null)
+                {
+                    if (activeDisplay.Matches(settings.RigMonitorId))
+                    {
+                        activeProfile = ProfileMode.SimRig;
+                    }
+                    else if (activeDisplay.Matches(settings.DeskMonitorId))
+                    {
+                        activeProfile = ProfileMode.Desk;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Startup display detection failed: {ex.Message}");
+            }
+
+            if (coordinator.CurrentProfile != activeProfile)
+            {
+                coordinator.SetCurrentProfile(activeProfile);
+            }
+
+            _trayIconService.UpdateTrayState(coordinator.CurrentProfile);
+
+            viewModel.RegisterGlobalHotkeys(settings);
+
+            coordinator.ProfileChanged += (sender, args) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (args.Success)
+                    {
+                        _trayIconService.UpdateTrayState(args.NewProfile);
+                        _trayIconService.ShowNotification("RigSwitch", $"Switched to {args.NewProfile} setup.");
+                    }
+                    else
+                    {
+                        _trayIconService.ShowNotification("RigSwitch Error", args.ErrorMessage ?? $"Failed to switch to {args.NewProfile}.");
+                    }
+                });
+            };
+
+            bool startMinimized = settings.StartMinimizedToTray;
+            if (!startMinimized)
+            {
+                ShowSettingsWindow();
+            }
+        }
+        catch (Exception ex)
         {
-            ShowSettingsWindow();
+            MessageBox.Show(
+                $"A critical error occurred while starting RigSwitch:\n\n{ex.Message}",
+                "RigSwitch Startup Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            Shutdown(1);
         }
     }
 

@@ -66,4 +66,38 @@ public sealed record DisplayDeviceInfo
     /// Gets a value indicating whether this display is currently the primary display.
     /// </summary>
     public bool IsPrimary { get; init; }
+
+    /// <summary>
+    /// Checks whether this display device matches the specified monitor identifier, device path, or friendly name.
+    /// </summary>
+    /// <param name="identifier">The identifier, device path, or friendly name to match against.</param>
+    /// <returns><c>true</c> if this display matches the identifier; otherwise, <c>false</c>.</returns>
+    public bool Matches(string? identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(MonitorId) &&
+            string.Equals(MonitorId, identifier, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(DevicePath) &&
+            (string.Equals(DevicePath, identifier, StringComparison.OrdinalIgnoreCase) ||
+             DevicePath.Contains(identifier, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(FriendlyName) &&
+            string.Equals(FriendlyName, identifier, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
 }

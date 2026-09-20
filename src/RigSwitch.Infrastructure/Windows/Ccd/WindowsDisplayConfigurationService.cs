@@ -189,6 +189,11 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
         {
             for (int i = 0; i < clonedPaths.Length; i++)
             {
+                if (i == targetIndex)
+                {
+                    continue;
+                }
+
                 var (monId, devPath, friendly) = pathTargetInfos[i];
                 if (MatchesMonitor(inactiveMonitorId, monId, devPath, friendly))
                 {

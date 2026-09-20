@@ -25,4 +25,10 @@ public interface IProfileSwitchCoordinator
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
     /// <returns><c>true</c> if the profile transition completed successfully; otherwise, <c>false</c>.</returns>
     Task<bool> SwitchProfileAsync(ProfileMode targetProfile, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the currently active workstation profile state without performing hardware reconfiguration.
+    /// </summary>
+    /// <param name="profile">The workstation profile mode to set.</param>
+    void SetCurrentProfile(ProfileMode profile);
 }

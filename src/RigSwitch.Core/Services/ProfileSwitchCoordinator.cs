@@ -1,5 +1,6 @@
 namespace RigSwitch.Core.Services;
 
+using System.Text.RegularExpressions;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Events;
 using RigSwitch.Core.Interfaces;
@@ -8,7 +9,7 @@ using RigSwitch.Core.Models;
 /// <summary>
 /// Coordinates atomic workstation profile transitions across display, audio, and configuration subsystems.
 /// </summary>
-public sealed class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDisposable
+public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDisposable
 {
     private readonly IDisplayConfigurationService _displayConfigService;
     private readonly IAudioEndpointDirector _audioDirector;
@@ -43,6 +44,12 @@ public sealed class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDispo
     public ProfileMode CurrentProfile { get; private set; }
 
     /// <inheritdoc />
+    public void SetCurrentProfile(ProfileMode profile)
+    {
+        CurrentProfile = profile;
+    }
+
+    /// <inheritdoc />
     public event EventHandler<ProfileChangedEventArgs>? ProfileChanged;
 
     /// <inheritdoc />
@@ -68,8 +75,7 @@ public sealed class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDispo
 
             // Step 3: Safety Gate (Reachability Verification)
             var displays = await _displayConfigService.EnumerateDisplaysAsync(cancellationToken).ConfigureAwait(false);
-            var isTargetPresent = displays.Any(d =>
-                string.Equals(d.MonitorId, targetMonitorId, StringComparison.OrdinalIgnoreCase));
+            var isTargetPresent = IsDisplayConnected(targetMonitorId, displays);
 
             if (!isTargetPresent)
             {
@@ -87,25 +93,28 @@ public sealed class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDispo
 
             if (targetProfile == ProfileMode.Desk)
             {
-                if (!string.IsNullOrWhiteSpace(settings.DeskPrimaryAudioId) &&
-                    endpoints.Any(e => string.Equals(e.Id, settings.DeskPrimaryAudioId, StringComparison.OrdinalIgnoreCase) && e.State == DevicePresenceState.Active))
+                var primaryMatch = endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.DeskPrimaryAudioId) && e.State == DevicePresenceState.Active);
+                var fallbackMatch = endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.DeskFallbackAudioId) && e.State == DevicePresenceState.Active);
+
+                if (!string.IsNullOrWhiteSpace(settings.DeskPrimaryAudioId) && primaryMatch != null)
                 {
-                    resolvedAudioId = settings.DeskPrimaryAudioId;
+                    resolvedAudioId = primaryMatch.Id;
                 }
-                else if (!string.IsNullOrWhiteSpace(settings.DeskFallbackAudioId) &&
-                         endpoints.Any(e => string.Equals(e.Id, settings.DeskFallbackAudioId, StringComparison.OrdinalIgnoreCase) && e.State == DevicePresenceState.Active))
+                else if (!string.IsNullOrWhiteSpace(settings.DeskFallbackAudioId) && fallbackMatch != null)
                 {
-                    resolvedAudioId = settings.DeskFallbackAudioId;
+                    resolvedAudioId = fallbackMatch.Id;
                 }
                 else
                 {
                     var firstActive = endpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active);
-                    resolvedAudioId = firstActive?.Id ?? settings.DeskPrimaryAudioId;
+                    resolvedAudioId = firstActive?.Id ??
+                        (endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.DeskPrimaryAudioId))?.Id ?? settings.DeskPrimaryAudioId);
                 }
             }
             else
             {
-                resolvedAudioId = settings.RigPrimaryAudioId;
+                var rigMatch = endpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, settings.RigPrimaryAudioId));
+                resolvedAudioId = rigMatch?.Id ?? settings.RigPrimaryAudioId;
             }
 
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
@@ -115,7 +124,18 @@ public sealed class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDispo
 
             if (settings.HiddenAudioEndpointIds is { Count: > 0 })
             {
-                await _audioDirector.SyncHiddenEndpointsAsync(settings.HiddenAudioEndpointIds, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _audioDirector.SyncHiddenEndpointsAsync(settings.HiddenAudioEndpointIds, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning($"Failed to synchronize hidden audio endpoints: {ex.Message}");
+                }
             }
 
             // Step 6: State & Settings Persistence
@@ -139,6 +159,39 @@ public sealed class ProfileSwitchCoordinator : IProfileSwitchCoordinator, IDispo
         {
             _gate.Release();
         }
+    }
+
+    private static bool IsDisplayConnected(string targetMonitorId, IEnumerable<DisplayDeviceInfo> displays)
+    {
+        return displays.Any(d => d.Matches(targetMonitorId));
+    }
+
+    [GeneratedRegex(@"(?:\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", RegexOptions.RightToLeft)]
+    private static partial Regex GuidPattern();
+
+    private static bool MatchesEndpoint(string? idA, string? idB)
+    {
+        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB))
+        {
+            return false;
+        }
+
+        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var matchA = GuidPattern().Match(idA);
+        var matchB = GuidPattern().Match(idB);
+
+        if (matchA.Success && matchB.Success &&
+            Guid.TryParse(matchA.Value, out var guidA) &&
+            Guid.TryParse(matchB.Value, out var guidB))
+        {
+            return guidA == guidB;
+        }
+
+        return false;
     }
 
     /// <inheritdoc />

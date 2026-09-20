@@ -1,6 +1,7 @@
 namespace RigSwitch.App.ViewModels;
 
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using System.Windows.Input;
 using RigSwitch.App.Services;
 using RigSwitch.Core.Enums;
@@ -11,7 +12,7 @@ using RigSwitch.Core.Models;
 /// <summary>
 /// Primary view model orchestrating hardware profiles, device renaming, audio visibility, and system preferences.
 /// </summary>
-public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
+public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly IProfileSwitchCoordinator _coordinator;
     private readonly ISettingsStorageService _settingsStorage;
@@ -162,10 +163,10 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
             }
 
             AudioEndpointsVisibility.Clear();
-            var hiddenSet = new HashSet<string>(_settings.HiddenAudioEndpointIds, StringComparer.OrdinalIgnoreCase);
+            var hiddenList = _settings.HiddenAudioEndpointIds;
             foreach (var a in audioEndpoints)
             {
-                bool isVisible = !hiddenSet.Contains(a.Id);
+                bool isVisible = !hiddenList.Any(hId => MatchesEndpoint(hId, a.Id));
                 AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(
                     a.Id,
                     a.Name,
@@ -326,11 +327,11 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
             {
                 if (isVisible)
                 {
-                    _settings.HiddenAudioEndpointIds.RemoveAll(id => string.Equals(id, item.Id, StringComparison.OrdinalIgnoreCase));
+                    _settings.HiddenAudioEndpointIds.RemoveAll(id => MatchesEndpoint(id, item.Id));
                 }
                 else
                 {
-                    if (!_settings.HiddenAudioEndpointIds.Any(id => string.Equals(id, item.Id, StringComparison.OrdinalIgnoreCase)))
+                    if (!_settings.HiddenAudioEndpointIds.Any(id => MatchesEndpoint(id, item.Id)))
                     {
                         _settings.HiddenAudioEndpointIds.Add(item.Id);
                     }
@@ -346,6 +347,34 @@ public sealed class MainSettingsViewModel : ViewModelBase, IDisposable
             item.RevertVisibility(!isVisible);
             StatusMessage = $"Failed to update visibility for {item.Name}: {ex.Message}";
         }
+    }
+
+    [GeneratedRegex(@"(?:\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", RegexOptions.RightToLeft)]
+    private static partial Regex GuidPattern();
+
+    private static bool MatchesEndpoint(string? idA, string? idB)
+    {
+        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB))
+        {
+            return false;
+        }
+
+        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var matchA = GuidPattern().Match(idA);
+        var matchB = GuidPattern().Match(idB);
+
+        if (matchA.Success && matchB.Success &&
+            Guid.TryParse(matchA.Value, out var guidA) &&
+            Guid.TryParse(matchB.Value, out var guidB))
+        {
+            return guidA == guidB;
+        }
+
+        return false;
     }
 
     private void OnProfileChanged(object? sender, ProfileChangedEventArgs e)
