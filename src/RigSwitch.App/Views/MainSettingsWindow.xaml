@@ -111,6 +111,85 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Preset Templates -->
+        <DataTemplate x:Key="PresetHeaderTemplate" DataType="{x:Type vm:PresetConfigurationItemViewModel}">
+            <TextBlock Text="{Binding Header}" FontSize="12" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="PresetDetailTemplate" DataType="{x:Type vm:PresetConfigurationItemViewModel}">
+            <StackPanel Margin="0,12,0,4">
+                <RadioButton Content="Active / Default Preset"
+                             IsChecked="{Binding IsActive, Mode=TwoWay}"
+                             GroupName="{Binding GroupName}"
+                             FontWeight="SemiBold"
+                             Margin="0,0,0,12" />
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Preset Name:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBox Grid.Column="1" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Target Display:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableDisplayOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding TargetMonitorId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName"
+                              Margin="0,0,8,0" />
+                    <Button Grid.Column="2"
+                            Content="🖥️ Windows Display Settings"
+                            Command="{Binding OpenDisplaySettingsCommand}"
+                            Padding="8,4"
+                            FontSize="12" />
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Primary Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding PrimaryAudioId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Fallback Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding FallbackAudioId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Direct Hotkey:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBox Grid.Column="1" Text="{Binding DirectHotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -148,73 +227,19 @@
                     <StackPanel>
                         <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="🖥️ Desk Profile Configuration" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="180" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Target Display:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ComboBox Grid.Column="1"
-                                              ItemsSource="{Binding AvailableDisplayOptions}"
-                                              SelectedValue="{Binding DeskMonitorId, Mode=TwoWay}"
-                                              SelectedValuePath="Id"
-                                              DisplayMemberPath="DisplayName" />
-                                </Grid>
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="180" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Primary Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ComboBox Grid.Column="1"
-                                              ItemsSource="{Binding AvailableAudioOptions}"
-                                              SelectedValue="{Binding DeskPrimaryAudioId, Mode=TwoWay}"
-                                              SelectedValuePath="Id"
-                                              DisplayMemberPath="DisplayName" />
-                                </Grid>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="180" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Fallback Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ComboBox Grid.Column="1"
-                                              ItemsSource="{Binding AvailableAudioOptions}"
-                                              SelectedValue="{Binding DeskFallbackAudioId, Mode=TwoWay}"
-                                              SelectedValuePath="Id"
-                                              DisplayMemberPath="DisplayName" />
-                                </Grid>
+                                <TextBlock Text="🖥️ Desk Presets" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                <TabControl ItemsSource="{Binding DeskPresets}"
+                                            ItemTemplate="{StaticResource PresetHeaderTemplate}"
+                                            ContentTemplate="{StaticResource PresetDetailTemplate}" />
                             </StackPanel>
                         </Border>
 
                         <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="🏎️ Sim Rig Profile Configuration" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="180" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Target Display:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ComboBox Grid.Column="1"
-                                              ItemsSource="{Binding AvailableDisplayOptions}"
-                                              SelectedValue="{Binding RigMonitorId, Mode=TwoWay}"
-                                              SelectedValuePath="Id"
-                                              DisplayMemberPath="DisplayName" />
-                                </Grid>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="180" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Primary Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ComboBox Grid.Column="1"
-                                              ItemsSource="{Binding AvailableAudioOptions}"
-                                              SelectedValue="{Binding RigPrimaryAudioId, Mode=TwoWay}"
-                                              SelectedValuePath="Id"
-                                              DisplayMemberPath="DisplayName" />
-                                </Grid>
+                                <TextBlock Text="🏎️ Sim Rig Presets" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                <TabControl ItemsSource="{Binding RigPresets}"
+                                            ItemTemplate="{StaticResource PresetHeaderTemplate}"
+                                            ContentTemplate="{StaticResource PresetDetailTemplate}" />
                             </StackPanel>
                         </Border>
 

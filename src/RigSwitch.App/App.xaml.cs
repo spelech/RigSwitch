@@ -62,7 +62,7 @@ public partial class App : Application
             _mainWindow = _host.Services.GetRequiredService<MainSettingsWindow>();
             _trayIconService = _host.Services.GetRequiredService<TrayIconService>();
 
-            _trayIconService.Initialize(ShowSettingsWindow);
+            _trayIconService.Initialize(ShowSettingsWindow, settingsStorage);
 
             var settings = await settingsStorage.LoadSettingsAsync();
             _trayIconService.ShowToastNotifications = settings.ShowToastNotifications;
@@ -98,7 +98,7 @@ public partial class App : Application
                 coordinator.SetCurrentProfile(activeProfile);
             }
 
-            _trayIconService.UpdateTrayState(coordinator.CurrentProfile);
+            _trayIconService.UpdateTrayState(coordinator.CurrentProfile, coordinator.CurrentPreset);
 
             viewModel.RegisterGlobalHotkeys(settings);
 
@@ -108,8 +108,8 @@ public partial class App : Application
                 {
                     if (args.Success)
                     {
-                        _trayIconService.UpdateTrayState(args.NewProfile);
-                        _trayIconService.ShowNotification("RigSwitch", $"Switched to {args.NewProfile} setup.");
+                        _trayIconService.UpdateTrayState(args.NewProfile, args.ActivePreset);
+                        _trayIconService.ShowNotification("RigSwitch", $"Switched to {args.NewProfile} setup [{args.ActivePreset?.Name ?? "Default"}].");
                     }
                     else
                     {

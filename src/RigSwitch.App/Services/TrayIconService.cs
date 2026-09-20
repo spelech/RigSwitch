@@ -5,6 +5,7 @@ using System.Threading;
 using System.Windows.Forms;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
+using RigSwitch.Core.Models;
 
 /// <summary>
 /// Manages the Windows taskbar system tray icon, context menu, and balloon notifications.
@@ -14,10 +15,16 @@ using RigSwitch.Core.Interfaces;
 public sealed class TrayIconService : IDisposable
 {
     private readonly IProfileSwitchCoordinator _coordinator;
+    private ISettingsStorageService _settingsStorage;
     private NotifyIcon? _notifyIcon;
     private Control? _invoker;
     private Action? _openSettingsAction;
     private bool _disposed;
+
+    private readonly List<ToolStripMenuItem> _deskPresetMenuItems = [];
+    private readonly List<ToolStripMenuItem> _rigPresetMenuItems = [];
+    private ToolStripMenuItem? _deskMenuItem;
+    private ToolStripMenuItem? _rigMenuItem;
 
     /// <summary>
     /// Gets or sets a value indicating whether balloon toast notifications are displayed.
@@ -28,19 +35,27 @@ public sealed class TrayIconService : IDisposable
     /// Initializes a new instance of the <see cref="TrayIconService"/> class.
     /// </summary>
     /// <param name="coordinator">The workstation profile switch coordinator.</param>
-    public TrayIconService(IProfileSwitchCoordinator coordinator)
+    /// <param name="settingsStorage">The settings storage service for retrieving presets.</param>
+    public TrayIconService(IProfileSwitchCoordinator coordinator, ISettingsStorageService settingsStorage)
     {
         ArgumentNullException.ThrowIfNull(coordinator);
+        ArgumentNullException.ThrowIfNull(settingsStorage);
         _coordinator = coordinator;
+        _settingsStorage = settingsStorage;
     }
 
     /// <summary>
     /// Initializes and displays the system tray icon on a dedicated WinForms STA thread.
     /// </summary>
     /// <param name="openSettingsAction">Action invoked when settings are requested.</param>
-    public void Initialize(Action openSettingsAction)
+    /// <param name="settingsStorage">Optional settings storage service to override or supply if not provided in constructor.</param>
+    public void Initialize(Action openSettingsAction, ISettingsStorageService? settingsStorage = null)
     {
         ArgumentNullException.ThrowIfNull(openSettingsAction);
+        if (settingsStorage != null)
+        {
+            _settingsStorage = settingsStorage;
+        }
         _openSettingsAction = openSettingsAction;
 
         using var ready = new ManualResetEventSlim(false);
@@ -53,7 +68,7 @@ public sealed class TrayIconService : IDisposable
 
             var contextMenu = new ContextMenuStrip();
 
-            var deskMenuItem = new ToolStripMenuItem("🖥️ Switch to Desk Setup", null, (s, e) =>
+            _deskMenuItem = new ToolStripMenuItem("🖥️ Switch to Desk Setup", null, (s, e) =>
             {
                 _ = Task.Run(async () =>
                 {
@@ -61,13 +76,25 @@ public sealed class TrayIconService : IDisposable
                 });
             });
 
-            var rigMenuItem = new ToolStripMenuItem("🏎️ Switch to Sim Rig Setup", null, (s, e) =>
+            _rigMenuItem = new ToolStripMenuItem("🏎️ Switch to Sim Rig Setup", null, (s, e) =>
             {
                 _ = Task.Run(async () =>
                 {
                     await _coordinator.SwitchProfileAsync(ProfileMode.SimRig).ConfigureAwait(false);
                 });
             });
+
+            UserSettings settings;
+            try
+            {
+                settings = _settingsStorage.LoadSettingsAsync().GetAwaiter().GetResult();
+            }
+            catch
+            {
+                settings = new UserSettings();
+            }
+
+            BuildPresetSubmenus(settings);
 
             var separator = new ToolStripSeparator();
 
@@ -86,8 +113,8 @@ public sealed class TrayIconService : IDisposable
 
             contextMenu.Items.AddRange(
             [
-                deskMenuItem,
-                rigMenuItem,
+                _deskMenuItem,
+                _rigMenuItem,
                 separator,
                 settingsMenuItem,
                 exitMenuItem
@@ -113,7 +140,7 @@ public sealed class TrayIconService : IDisposable
                 }
             };
 
-            ApplyTrayState(_coordinator.CurrentProfile);
+            ApplyTrayState(_coordinator.CurrentProfile, _coordinator.CurrentPreset);
             ready.Set();
 
             // Drive the WinForms message loop so the tray icon receives Windows messages.
@@ -131,11 +158,77 @@ public sealed class TrayIconService : IDisposable
     }
 
     /// <summary>
-    /// Updates the system tray icon image and tooltip to reflect the active profile.
+    /// Rebuilds the preset submenu items to reflect updated preset names from user settings.
+    /// Thread-safe — marshals to the tray icon's STA thread.
+    /// </summary>
+    /// <param name="settings">The updated user settings containing presets.</param>
+    public void RefreshPresets(UserSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (_invoker == null || _invoker.IsDisposed)
+        {
+            return;
+        }
+
+        if (_invoker.InvokeRequired)
+        {
+            _invoker.Invoke(() => BuildPresetSubmenus(settings));
+            return;
+        }
+
+        BuildPresetSubmenus(settings);
+    }
+
+    private void BuildPresetSubmenus(UserSettings settings)
+    {
+        _deskPresetMenuItems.Clear();
+        _deskMenuItem?.DropDownItems.Clear();
+        for (int i = 0; i < settings.DeskPresets.Count; i++)
+        {
+            var preset = settings.DeskPresets[i];
+            int presetIndex = i;
+            var subItem = new ToolStripMenuItem(preset.Name, null, (s, e) =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    await _coordinator.SwitchToPresetAsync(ProfileMode.Desk, presetIndex).ConfigureAwait(false);
+                });
+            })
+            {
+                Tag = preset.Id
+            };
+            _deskPresetMenuItems.Add(subItem);
+            _deskMenuItem?.DropDownItems.Add(subItem);
+        }
+
+        _rigPresetMenuItems.Clear();
+        _rigMenuItem?.DropDownItems.Clear();
+        for (int i = 0; i < settings.RigPresets.Count; i++)
+        {
+            var preset = settings.RigPresets[i];
+            int presetIndex = i;
+            var subItem = new ToolStripMenuItem(preset.Name, null, (s, e) =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    await _coordinator.SwitchToPresetAsync(ProfileMode.SimRig, presetIndex).ConfigureAwait(false);
+                });
+            })
+            {
+                Tag = preset.Id
+            };
+            _rigPresetMenuItems.Add(subItem);
+            _rigMenuItem?.DropDownItems.Add(subItem);
+        }
+    }
+
+    /// <summary>
+    /// Updates the system tray icon image, tooltip, and submenu checkmarks to reflect the active profile and preset.
     /// Thread-safe — marshals to the tray icon's STA thread.
     /// </summary>
     /// <param name="mode">The active workstation profile mode.</param>
-    public void UpdateTrayState(ProfileMode mode)
+    /// <param name="preset">The active workstation preset, or null to determine from coordinator.</param>
+    public void UpdateTrayState(ProfileMode mode, WorkstationPreset? preset = null)
     {
         if (_invoker == null || _notifyIcon == null)
         {
@@ -144,11 +237,11 @@ public sealed class TrayIconService : IDisposable
 
         if (_invoker.InvokeRequired)
         {
-            _invoker.Invoke(() => ApplyTrayState(mode));
+            _invoker.Invoke(() => ApplyTrayState(mode, preset));
             return;
         }
 
-        ApplyTrayState(mode);
+        ApplyTrayState(mode, preset);
     }
 
     /// <summary>
@@ -200,7 +293,7 @@ public sealed class TrayIconService : IDisposable
         _invoker = null;
     }
 
-    private void ApplyTrayState(ProfileMode mode)
+    private void ApplyTrayState(ProfileMode mode, WorkstationPreset? preset = null)
     {
         if (_notifyIcon == null)
         {
@@ -211,11 +304,62 @@ public sealed class TrayIconService : IDisposable
         var newIcon = CreateProfileIcon(mode);
 
         _notifyIcon.Icon = newIcon;
-        _notifyIcon.Text = mode == ProfileMode.Desk
-            ? "RigSwitch - Desk Setup"
-            : "RigSwitch - Sim Rig Setup";
+
+        var activePreset = preset ?? _coordinator.CurrentPreset;
+        var presetName = activePreset?.Name ?? "Default";
+        var tooltip = mode == ProfileMode.Desk
+            ? $"RigSwitch - Desk Setup ({presetName})"
+            : $"RigSwitch - Sim Rig Setup ({presetName})";
+
+        if (tooltip.Length > 63)
+        {
+            tooltip = tooltip[..63];
+        }
+
+        _notifyIcon.Text = tooltip;
 
         oldIcon?.Dispose();
+
+        if (_deskMenuItem != null)
+        {
+            _deskMenuItem.Checked = mode == ProfileMode.Desk;
+        }
+
+        if (_rigMenuItem != null)
+        {
+            _rigMenuItem.Checked = mode == ProfileMode.SimRig;
+        }
+
+        int activeIndex = _coordinator.CurrentPresetIndex;
+        if (preset != null)
+        {
+            var targetList = mode == ProfileMode.Desk ? _deskPresetMenuItems : _rigPresetMenuItems;
+            for (int i = 0; i < targetList.Count; i++)
+            {
+                if (targetList[i].Tag is string id && string.Equals(id, preset.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    activeIndex = i;
+                    targetList[i].Text = preset.Name;
+                    break;
+                }
+
+                if (string.Equals(targetList[i].Text, preset.Name, StringComparison.Ordinal))
+                {
+                    activeIndex = i;
+                    break;
+                }
+            }
+        }
+
+        for (int i = 0; i < _deskPresetMenuItems.Count; i++)
+        {
+            _deskPresetMenuItems[i].Checked = mode == ProfileMode.Desk && i == activeIndex;
+        }
+
+        for (int i = 0; i < _rigPresetMenuItems.Count; i++)
+        {
+            _rigPresetMenuItems[i].Checked = mode == ProfileMode.SimRig && i == activeIndex;
+        }
     }
 
     private static System.Drawing.Icon CreateProfileIcon(ProfileMode mode)

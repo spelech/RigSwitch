@@ -45,6 +45,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<DeviceSelectionOption> AvailableAudioOptions { get; } = [];
     public ObservableCollection<DeviceNicknameItemViewModel> DeviceNicknames { get; } = [];
     public ObservableCollection<AudioEndpointVisibilityItemViewModel> AudioEndpointsVisibility { get; } = [];
+    public ObservableCollection<PresetConfigurationItemViewModel> DeskPresets { get; } = [];
+    public ObservableCollection<PresetConfigurationItemViewModel> RigPresets { get; } = [];
 
     public ProfileMode CurrentProfile
     {
@@ -163,29 +165,46 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 AvailableDisplayOptions.Add(new DeviceSelectionOption(d.MonitorId, label));
             }
 
-            if (!string.IsNullOrWhiteSpace(DeskMonitorId) && !AvailableDisplayOptions.Any(opt => opt.Id == DeskMonitorId))
+            DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions);
+            DeviceOptionResolver.EnsureDisplayOption(RigMonitorId, AvailableDisplayOptions);
+
+            DeskPrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(DeskPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
+            DeskFallbackAudioId = DeviceOptionResolver.ResolveAudioOption(DeskFallbackAudioId, audioEndpoints, AvailableAudioOptions);
+            RigPrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(RigPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
+
+            DeskPresets.Clear();
+            for (int i = 0; i < _settings.DeskPresets.Count; i++)
             {
-                AvailableDisplayOptions.Add(new DeviceSelectionOption(DeskMonitorId, $"{DeskMonitorId} (Saved / Disconnected)"));
+                var preset = _settings.DeskPresets[i];
+                DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions);
+                preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions);
+                preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions);
+
+                bool isActive = i == _settings.ActiveDeskPresetIndex;
+                DeskPresets.Add(new PresetConfigurationItemViewModel(
+                    preset,
+                    i,
+                    "DeskActivePreset",
+                    isActive,
+                    OnDeskPresetActivated));
             }
 
-            if (!string.IsNullOrWhiteSpace(RigMonitorId) && !AvailableDisplayOptions.Any(opt => opt.Id == RigMonitorId))
+            RigPresets.Clear();
+            for (int i = 0; i < _settings.RigPresets.Count; i++)
             {
-                AvailableDisplayOptions.Add(new DeviceSelectionOption(RigMonitorId, $"{RigMonitorId} (Saved / Disconnected)"));
-            }
+                var preset = _settings.RigPresets[i];
+                DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions);
+                preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions);
+                preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions);
 
-            AvailableAudioOptions.Clear();
-            AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio (None) —"));
-            foreach (var a in audioEndpoints)
-            {
-                var label = string.IsNullOrWhiteSpace(a.AdapterDescription)
-                    ? a.Name
-                    : $"{a.Name} ({a.AdapterDescription})";
-                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, label));
+                bool isActive = i == _settings.ActiveRigPresetIndex;
+                RigPresets.Add(new PresetConfigurationItemViewModel(
+                    preset,
+                    i,
+                    "RigActivePreset",
+                    isActive,
+                    OnRigPresetActivated));
             }
-
-            DeskPrimaryAudioId = ResolveAudioOption(DeskPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
-            DeskFallbackAudioId = ResolveAudioOption(DeskFallbackAudioId, audioEndpoints, AvailableAudioOptions);
-            RigPrimaryAudioId = ResolveAudioOption(RigPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
 
             DeviceNicknames.Clear();
             foreach (var d in displays)
@@ -203,7 +222,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             var hiddenList = _settings.HiddenAudioEndpointIds;
             foreach (var a in audioEndpoints)
             {
-                bool isVisible = !hiddenList.Any(hId => MatchesEndpoint(hId, a.Id));
+                bool isVisible = !hiddenList.Any(hId => DeviceOptionResolver.MatchesEndpoint(hId, a.Id));
                 AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(
                     a.Id,
                     a.Name,
@@ -251,11 +270,40 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         try
         {
             var settings = _settings ?? new UserSettings();
-            settings.DeskMonitorId = DeskMonitorId;
-            settings.RigMonitorId = RigMonitorId;
-            settings.DeskPrimaryAudioId = DeskPrimaryAudioId;
-            settings.DeskFallbackAudioId = DeskFallbackAudioId;
-            settings.RigPrimaryAudioId = RigPrimaryAudioId;
+
+            // Update Desk Presets
+            for (int i = 0; i < DeskPresets.Count; i++)
+            {
+                if (i < settings.DeskPresets.Count)
+                {
+                    DeskPresets[i].ApplyTo(settings.DeskPresets[i]);
+                }
+            }
+            var activeDeskIdx = DeskPresets.TakeWhile(p => !p.IsActive).Count();
+            settings.ActiveDeskPresetIndex = activeDeskIdx < DeskPresets.Count ? activeDeskIdx : 0;
+
+            // Update Rig Presets
+            for (int i = 0; i < RigPresets.Count; i++)
+            {
+                if (i < settings.RigPresets.Count)
+                {
+                    RigPresets[i].ApplyTo(settings.RigPresets[i]);
+                }
+            }
+            var activeRigIdx = RigPresets.TakeWhile(p => !p.IsActive).Count();
+            settings.ActiveRigPresetIndex = activeRigIdx < RigPresets.Count ? activeRigIdx : 0;
+
+            settings.DeskMonitorId = settings.GetActivePreset(ProfileMode.Desk).TargetMonitorId;
+            settings.DeskPrimaryAudioId = settings.GetActivePreset(ProfileMode.Desk).PrimaryAudioId;
+            settings.DeskFallbackAudioId = settings.GetActivePreset(ProfileMode.Desk).FallbackAudioId;
+            settings.RigMonitorId = settings.GetActivePreset(ProfileMode.SimRig).TargetMonitorId;
+            settings.RigPrimaryAudioId = settings.GetActivePreset(ProfileMode.SimRig).PrimaryAudioId;
+
+            DeskMonitorId = settings.DeskMonitorId;
+            DeskPrimaryAudioId = settings.DeskPrimaryAudioId;
+            DeskFallbackAudioId = settings.DeskFallbackAudioId;
+            RigMonitorId = settings.RigMonitorId;
+            RigPrimaryAudioId = settings.RigPrimaryAudioId;
 
             settings.ToggleHotkey = ToggleHotkey;
             settings.DeskHotkey = DeskHotkey;
@@ -281,6 +329,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             RegisterGlobalHotkeys(settings);
             _trayIconService.ShowToastNotifications = settings.ShowToastNotifications;
+            _trayIconService.RefreshPresets(settings);
 
             if (string.IsNullOrEmpty(StatusMessage) || !StatusMessage.StartsWith("Warning:", StringComparison.Ordinal))
             {
@@ -306,51 +355,59 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         _hotkeyService.UnregisterAll();
         var failedHotkeys = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(settings.ToggleHotkey))
+        void TryRegister(string? hotkey, Action action)
         {
-            bool registered = _hotkeyService.RegisterHotkey(settings.ToggleHotkey, () =>
+            if (!string.IsNullOrWhiteSpace(hotkey) && !_hotkeyService.RegisterHotkey(hotkey, action))
             {
-                var nextProfile = _coordinator.CurrentProfile == ProfileMode.Desk
-                    ? ProfileMode.SimRig
-                    : ProfileMode.Desk;
-                _ = _coordinator.SwitchProfileAsync(nextProfile);
-            });
-
-            if (!registered)
-            {
-                failedHotkeys.Add(settings.ToggleHotkey);
+                failedHotkeys.Add(hotkey);
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(settings.DeskHotkey))
+        TryRegister(settings.ToggleHotkey, () =>
         {
-            bool registered = _hotkeyService.RegisterHotkey(settings.DeskHotkey, () =>
-            {
-                _ = _coordinator.SwitchProfileAsync(ProfileMode.Desk);
-            });
+            var next = _coordinator.CurrentProfile == ProfileMode.Desk ? ProfileMode.SimRig : ProfileMode.Desk;
+            _ = _coordinator.SwitchProfileAsync(next);
+        });
+        TryRegister(settings.DeskHotkey, () => _ = _coordinator.SwitchProfileAsync(ProfileMode.Desk));
+        TryRegister(settings.RigHotkey, () => _ = _coordinator.SwitchProfileAsync(ProfileMode.SimRig));
 
-            if (!registered)
-            {
-                failedHotkeys.Add(settings.DeskHotkey);
-            }
+        for (int i = 0; i < settings.DeskPresets.Count; i++)
+        {
+            int index = i;
+            TryRegister(settings.DeskPresets[i].DirectHotkey, () => _ = _coordinator.SwitchToPresetAsync(ProfileMode.Desk, index));
         }
 
-        if (!string.IsNullOrWhiteSpace(settings.RigHotkey))
+        for (int i = 0; i < settings.RigPresets.Count; i++)
         {
-            bool registered = _hotkeyService.RegisterHotkey(settings.RigHotkey, () =>
-            {
-                _ = _coordinator.SwitchProfileAsync(ProfileMode.SimRig);
-            });
-
-            if (!registered)
-            {
-                failedHotkeys.Add(settings.RigHotkey);
-            }
+            int index = i;
+            TryRegister(settings.RigPresets[i].DirectHotkey, () => _ = _coordinator.SwitchToPresetAsync(ProfileMode.SimRig, index));
         }
 
         if (failedHotkeys.Count > 0)
         {
             StatusMessage = $"Warning: Failed to register hotkey(s): {string.Join(", ", failedHotkeys)}";
+        }
+    }
+
+    private void OnDeskPresetActivated(PresetConfigurationItemViewModel activated)
+    {
+        foreach (var preset in DeskPresets)
+        {
+            if (preset != activated)
+            {
+                preset.IsActive = false;
+            }
+        }
+    }
+
+    private void OnRigPresetActivated(PresetConfigurationItemViewModel activated)
+    {
+        foreach (var preset in RigPresets)
+        {
+            if (preset != activated)
+            {
+                preset.IsActive = false;
+            }
         }
     }
 
@@ -364,11 +421,11 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             {
                 if (isVisible)
                 {
-                    _settings.HiddenAudioEndpointIds.RemoveAll(id => MatchesEndpoint(id, item.Id));
+                    _settings.HiddenAudioEndpointIds.RemoveAll(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id));
                 }
                 else
                 {
-                    if (!_settings.HiddenAudioEndpointIds.Any(id => MatchesEndpoint(id, item.Id)))
+                    if (!_settings.HiddenAudioEndpointIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id)))
                     {
                         _settings.HiddenAudioEndpointIds.Add(item.Id);
                     }
@@ -384,55 +441,6 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             item.RevertVisibility(!isVisible);
             StatusMessage = $"Failed to update visibility for {item.Name}: {ex.Message}";
         }
-    }
-
-    [GeneratedRegex(@"(?:\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", RegexOptions.RightToLeft)]
-    private static partial Regex GuidPattern();
-
-    private static bool MatchesEndpoint(string? idA, string? idB)
-    {
-        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB))
-        {
-            return false;
-        }
-
-        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var matchA = GuidPattern().Match(idA);
-        var matchB = GuidPattern().Match(idB);
-
-        if (matchA.Success && matchB.Success &&
-            Guid.TryParse(matchA.Value, out var guidA) &&
-            Guid.TryParse(matchB.Value, out var guidB))
-        {
-            return guidA == guidB;
-        }
-
-        return false;
-    }
-
-    private static string ResolveAudioOption(string targetId, IEnumerable<AudioEndpointInfo> endpoints, ObservableCollection<DeviceSelectionOption> options)
-    {
-        if (string.IsNullOrWhiteSpace(targetId))
-        {
-            return string.Empty;
-        }
-
-        var match = endpoints.FirstOrDefault(a => MatchesEndpoint(a.Id, targetId));
-        if (match != null)
-        {
-            return match.Id;
-        }
-
-        if (!options.Any(opt => opt.Id == targetId))
-        {
-            options.Add(new DeviceSelectionOption(targetId, $"{targetId} (Saved / Disconnected)"));
-        }
-
-        return targetId;
     }
 
     private void OnProfileChanged(object? sender, ProfileChangedEventArgs e)
