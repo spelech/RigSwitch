@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/spelech/RigSwitch?color=00C853&label=release)](https://github.com/spelech/RigSwitch/releases/latest)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
-[![Tests](https://img.shields.io/badge/tests-241%2F241%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
+[![Tests](https://img.shields.io/badge/tests-242%2F242%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
 [![.NET](https://img.shields.io/badge/.NET-10.0--windows-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D6.svg)](https://www.microsoft.com/windows)
 [![Toolbelt](https://img.shields.io/badge/standard-AgenticEngineeringToolbelt-6f42c1.svg)](docs/superpowers/specs/2026-09-19-rigswitch-design.md)
