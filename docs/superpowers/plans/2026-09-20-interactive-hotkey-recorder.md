@@ -30,9 +30,9 @@ Implement `HotkeyGestureParser` with:
 - Win32 validity checking (must have at least one modifier + valid non-modifier key).
 - Key normalizing (mapping SystemKey/F-keys/Numpad/letters).
 
-- [ ] **Step 1: Write unit tests for HotkeyGestureParser**
-- [ ] **Step 2: Implement HotkeyGestureParser.cs**
-- [ ] **Step 3: Run unit tests to confirm 100% pass**
+- [x] **Step 1: Write unit tests for HotkeyGestureParser**
+- [x] **Step 2: Implement HotkeyGestureParser.cs**
+- [x] **Step 3: Run unit tests to confirm 100% pass**
 
 ---
 
@@ -46,9 +46,9 @@ Implement `HotkeyGestureParser` with:
 **Description:**
 Create the interactive WPF control with `Hotkey` two-way dependency property, recording visual state, `PreviewKeyDown` handler capturing modifiers + key, Escape to cancel, and clear button.
 
-- [ ] **Step 1: Implement HotkeyRecorderControl.xaml and .xaml.cs**
-- [ ] **Step 2: Write unit tests for control logic**
-- [ ] **Step 3: Verify build with 0 warnings**
+- [x] **Step 1: Implement HotkeyRecorderControl.xaml and .xaml.cs**
+- [x] **Step 2: Write unit tests for control logic**
+- [x] **Step 3: Verify build with 0 warnings**
 
 ---
 
@@ -61,6 +61,6 @@ Create the interactive WPF control with `Hotkey` two-way dependency property, re
 **Description:**
 Replace all raw hotkey textboxes in `MainSettingsWindow.xaml` (Toggle hotkey, Desk hotkey, Sim Rig hotkey, and preset direct hotkeys) with `HotkeyRecorderControl`.
 
-- [ ] **Step 1: Update MainSettingsWindow.xaml with HotkeyRecorderControl**
-- [ ] **Step 2: Verify binding, tab order, and styling**
-- [ ] **Step 3: Verify file lengths < 500 lines and run full test suite**
+- [x] **Step 1: Update MainSettingsWindow.xaml with HotkeyRecorderControl**
+- [x] **Step 2: Verify binding, tab order, and styling**
+- [x] **Step 3: Verify file lengths < 500 lines and run full test suite**
