@@ -1,0 +1,119 @@
+name: RigSwitch CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate-1-format:
+    name: "Gate 1: Code Formatting & Static Analysis"
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore RigSwitch.slnx
+
+      - name: Verify Formatting (dotnet format)
+        run: dotnet format --verify-no-changes
+
+  gate-2-build:
+    name: "Gate 2: Release Solution Compilation"
+    runs-on: windows-latest
+    needs: gate-1-format
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore RigSwitch.slnx
+
+      - name: Compile Solution (Release)
+        run: dotnet build RigSwitch.slnx -c Release --no-restore
+
+  gate-3-test:
+    name: "Gate 3: Test Execution & Coverage"
+    runs-on: windows-latest
+    needs: gate-2-build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore RigSwitch.slnx
+
+      - name: Build Test Projects
+        run: dotnet build RigSwitch.slnx -c Release --no-restore
+
+      - name: Run Unit & Simulation Harness Tests
+        run: dotnet test RigSwitch.slnx -c Release --no-build --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test_results.trx"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore
+
+  gate-4-smoke-stage:
+    name: "Gate 4: Smoke Verification & Artifact Staging"
+    runs-on: windows-latest
+    needs: gate-3-test
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish WPF Desktop App
+        run: dotnet publish src/RigSwitch.App/RigSwitch.App.csproj -c Release -o publish/
+
+      - name: Smoke Verification (Binary Integrity)
+        shell: pwsh
+        run: |
+          $exePath = "publish/RigSwitch.App.exe"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "Smoke Verification Failed: $exePath not found!"
+            exit 1
+          }
+          $item = Get-Item $exePath
+          Write-Host "Smoke Verification Succeeded: $($item.FullName) ($($item.Length) bytes)"
+
+      - name: Stage Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigswitch-release-windows-x64
+          path: publish/
+          retention-days: 14
