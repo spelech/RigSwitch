@@ -1,7 +1,7 @@
 # 🚀 RigSwitch
 
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
-[![Tests](https://img.shields.io/badge/tests-104%2F104%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
+[![Tests](https://img.shields.io/badge/tests-241%2F241%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
 [![.NET](https://img.shields.io/badge/.NET-10.0--windows-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D6.svg)](https://www.microsoft.com/windows)
 [![Toolbelt](https://img.shields.io/badge/standard-AgenticEngineeringToolbelt-6f42c1.svg)](docs/superpowers/specs/2026-09-19-rigswitch-design.md)
@@ -17,11 +17,13 @@ Unlike basic primary display toggles, RigSwitch disables the inactive display at
 
 * 🖥️ **Instant Display Topology Switching**: Leverages low-level Win32 Connecting and Configuring Displays (CCD) APIs (`SetDisplayConfig`) to enable the target screen and disable the inactive screen atomically.
 * 🛡️ **Fail-Safe Safety Gates**: Verifies that the target display is physically connected and recognized by the GPU before altering topology, eliminating black-screen lockout risk.
-* 🔊 **Multi-Tier Audio Fallback**: Routes Windows default playback endpoints via CoreAudio COM (`IPolicyConfig`). Automatically falls back to a secondary playback device if primary desk speakers are unplugged or set to AUX mode.
+* 🎛️ **Multi-Preset Workstation Engine**: Configure up to 3 custom presets per environment (e.g. *GT3 / Circuit*, *Rally / Drift*, *Flight / Space* on the Sim Rig; *Work* vs *Gaming* on the Desk), each with dedicated display, audio routing, direct hotkeys, and app hooks.
+* 🚀 **Application Lifecycle Hooks**: Automatically launch specialized applications (e.g. Moza Pit House, SimHub, CrewChief) when entering a preset, and gracefully close them when switching away.
+* ⌨️ **Interactive Hotkey Recorder**: Press 2- or 3-key combinations directly to record and bind global shortcuts (`Ctrl+Alt+S`, `Alt+F1`, etc.) without manual typing.
+* 🔊 **Multi-Tier Audio Fallback**: Routes Windows default playback endpoints via CoreAudio COM (`IPolicyConfig`). Automatically falls back to secondary audio when primary speakers are unplugged or set to AUX mode.
 * 🧹 **Audio Endpoint Visibility Filter**: Easily hide cluttering virtual endpoints created by third-party audio drivers, VR headsets, or streaming devices directly within Windows.
-* ⌨️ **Global Simulator Hotkeys**: Low-level Win32 hotkey hooks that function seamlessly even inside exclusive full-screen racing simulators and games.
-* 📌 **Native System Tray Integration**: Lightweight WPF desktop app running resident in the taskbar with dynamically rendered GDI icons (workstation monitor for Desk mode, racing steering wheel for Sim Rig mode).
-* ⚙️ **Modern Dark-Mode Settings GUI**: Intuitive MVVM interface with automatic hardware detection dropdowns to easily select your displays and audio devices, customize nicknames, configure hotkeys, and toggle endpoint visibility.
+* 📌 **Native System Tray Integration**: Lightweight WPF desktop app resident in the taskbar with dynamic GDI icons, nested preset submenus with checkmarks, and dynamic tooltips.
+* ⚙️ **Modern Dark-Mode Settings GUI**: Intuitive MVVM interface with automatic hardware detection dropdowns to easily configure displays, audio, hotkeys, and app hooks.
 
 ---
 

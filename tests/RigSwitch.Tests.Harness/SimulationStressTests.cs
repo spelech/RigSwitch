@@ -239,4 +239,90 @@ public sealed class SimulationStressTests
         }
         Assert.Equal(DevicePresenceState.Active, context.GetAudioDeviceState(pebbleId));
     }
+
+    [Fact]
+    public async Task StressTest_RapidPresetSwitching_ConvergesDeterministically()
+    {
+        // Arrange
+        var context = new SimulationDisturbanceContext();
+        using var coordinator = context.CreateCoordinator(initialProfile: ProfileMode.Desk);
+
+        var switchSequence = new (ProfileMode Profile, int PresetIndex)[]
+        {
+            (ProfileMode.SimRig, 0),
+            (ProfileMode.SimRig, 1),
+            (ProfileMode.Desk, 0),
+            (ProfileMode.Desk, 2),
+            (ProfileMode.SimRig, 2),
+            (ProfileMode.Desk, 1),
+        };
+
+        // Act & Assert across rapid multi-preset switching cycles
+        for (var iteration = 0; iteration < 5; iteration++)
+        {
+            foreach (var (targetProfile, presetIndex) in switchSequence)
+            {
+                var success = await coordinator.SwitchToPresetAsync(targetProfile, presetIndex);
+                Assert.True(success);
+
+                // Verify coordinator convergence
+                Assert.Equal(targetProfile, coordinator.CurrentProfile);
+                Assert.Equal(presetIndex, coordinator.CurrentPresetIndex);
+
+                var expectedPreset = targetProfile == ProfileMode.Desk
+                    ? context.Settings.DeskPresets[presetIndex]
+                    : context.Settings.RigPresets[presetIndex];
+                Assert.Equal(expectedPreset.Name, coordinator.CurrentPreset.Name);
+
+                // Verify native display convergence
+                Assert.True(context.IsMonitorActive(expectedPreset.TargetMonitorId));
+
+                var inactiveProfile = targetProfile == ProfileMode.Desk ? ProfileMode.SimRig : ProfileMode.Desk;
+                var inactivePreset = context.Settings.GetActivePreset(inactiveProfile);
+                if (!string.Equals(inactivePreset.TargetMonitorId, expectedPreset.TargetMonitorId, StringComparison.OrdinalIgnoreCase))
+                {
+                    Assert.False(context.IsMonitorActive(inactivePreset.TargetMonitorId));
+                }
+
+                // Verify native audio convergence
+                Assert.Equal(expectedPreset.PrimaryAudioId, context.ActiveDefaultAudioId);
+                var endpoints = await context.AudioDirector.EnumerateAudioEndpointsAsync();
+                var activeEndpoint = endpoints.First(e => string.Equals(e.Id, expectedPreset.PrimaryAudioId, StringComparison.OrdinalIgnoreCase));
+                Assert.True(activeEndpoint.IsDefaultPlayback);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Disturbance_MonitorUnpluggedDuringPresetSwitch_HaltsGracefullyViaSafetyGateAndLogsToRingBuffer()
+    {
+        // Arrange
+        var context = new SimulationDisturbanceContext();
+        using var coordinator = context.CreateCoordinator(initialProfile: ProfileMode.Desk);
+        var targetPreset = context.Settings.RigPresets[1];
+
+        // Act: Inject disturbance by unplugging the monitor configured for SimRig Preset 1
+        using (new MonitorUnpluggedDisturbance(context, targetPreset.TargetMonitorId))
+        {
+            var switchSucceeded = await coordinator.SwitchToPresetAsync(ProfileMode.SimRig, 1);
+
+            // Assert: Safety gate halted transition gracefully
+            Assert.False(switchSucceeded);
+            Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
+            Assert.Equal(0, coordinator.CurrentPresetIndex);
+            Assert.True(context.IsMonitorActive(context.Settings.DeskMonitorId));
+
+            // Verify failure and monitor id are recorded in DiagnosticRingBuffer
+            var events = context.RingBuffer.GetSnapshot();
+            Assert.Contains(events, e => e.Success == false && (e.ErrorMessage?.Contains(targetPreset.TargetMonitorId) ?? false));
+        }
+
+        // Post-disturbance recovery: Once monitor is reconnected, preset switch succeeds
+        var recoverySwitch = await coordinator.SwitchToPresetAsync(ProfileMode.SimRig, 1);
+        Assert.True(recoverySwitch);
+        Assert.Equal(ProfileMode.SimRig, coordinator.CurrentProfile);
+        Assert.Equal(1, coordinator.CurrentPresetIndex);
+        Assert.True(context.IsMonitorActive(targetPreset.TargetMonitorId));
+        Assert.Equal(targetPreset.PrimaryAudioId, context.ActiveDefaultAudioId);
+    }
 }

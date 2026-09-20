@@ -2,8 +2,14 @@
   <PropertyGroup>
     <OutputType>Library</OutputType>
     <IsPackable>false</IsPackable>
+    <UseWPF>true</UseWPF>
     <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <Using Include="System.IO.Path" Alias="Path" />
+    <Using Include="System.IO.File" Alias="File" />
+    <Using Include="System.IO.Directory" Alias="Directory" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -17,5 +23,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RigSwitch.Core\RigSwitch.Core.csproj" />
     <ProjectReference Include="..\..\src\RigSwitch.Infrastructure\RigSwitch.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\RigSwitch.App\RigSwitch.App.csproj" />
   </ItemGroup>
 </Project>

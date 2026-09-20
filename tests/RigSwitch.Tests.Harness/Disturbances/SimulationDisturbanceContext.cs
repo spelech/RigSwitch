@@ -24,29 +24,42 @@ public sealed class SimulationDisturbanceContext
         RingBuffer = new DiagnosticRingBuffer(100);
         Settings = initialSettings ?? new UserSettings();
 
-        if (string.IsNullOrEmpty(Settings.DeskMonitorId))
+        while (Settings.DeskPresets.Count < 3)
         {
-            Settings.DeskMonitorId = "DESK_MONITOR_1";
+            Settings.DeskPresets.Add(new WorkstationPreset { Name = $"Desk Preset {Settings.DeskPresets.Count + 1}" });
         }
 
-        if (string.IsNullOrEmpty(Settings.RigMonitorId))
+        while (Settings.RigPresets.Count < 3)
         {
-            Settings.RigMonitorId = "RIG_MONITOR_1";
+            Settings.RigPresets.Add(new WorkstationPreset { Name = $"Rig Preset {Settings.RigPresets.Count + 1}" });
         }
 
-        if (string.IsNullOrEmpty(Settings.DeskPrimaryAudioId))
+        Settings.DeskMonitorId = string.IsNullOrEmpty(Settings.DeskMonitorId) ? "DESK_MONITOR_1" : Settings.DeskMonitorId;
+        Settings.RigMonitorId = string.IsNullOrEmpty(Settings.RigMonitorId) ? "RIG_MONITOR_1" : Settings.RigMonitorId;
+        Settings.DeskPrimaryAudioId = string.IsNullOrEmpty(Settings.DeskPrimaryAudioId) ? "{00000000-0000-0000-0000-000000000001}" : Settings.DeskPrimaryAudioId;
+        Settings.DeskFallbackAudioId = string.IsNullOrEmpty(Settings.DeskFallbackAudioId) ? "{00000000-0000-0000-0000-000000000002}" : Settings.DeskFallbackAudioId;
+        Settings.RigPrimaryAudioId = string.IsNullOrEmpty(Settings.RigPrimaryAudioId) ? "{00000000-0000-0000-0000-000000000003}" : Settings.RigPrimaryAudioId;
+
+        // Configure DeskPresets 0, 1, 2 with mock display and audio IDs if empty
+        for (var i = 0; i < Settings.DeskPresets.Count; i++)
         {
-            Settings.DeskPrimaryAudioId = "{00000000-0000-0000-0000-000000000001}";
+            var preset = Settings.DeskPresets[i];
+            preset.TargetMonitorId = string.IsNullOrEmpty(preset.TargetMonitorId) ? Settings.DeskMonitorId : preset.TargetMonitorId;
+            preset.PrimaryAudioId = string.IsNullOrEmpty(preset.PrimaryAudioId)
+                ? (i == 1 ? Settings.DeskFallbackAudioId : (i == 2 ? "{00000000-0000-0000-0000-000000000004}" : Settings.DeskPrimaryAudioId))
+                : preset.PrimaryAudioId;
+            preset.FallbackAudioId = string.IsNullOrEmpty(preset.FallbackAudioId) ? Settings.DeskFallbackAudioId : preset.FallbackAudioId;
         }
 
-        if (string.IsNullOrEmpty(Settings.DeskFallbackAudioId))
+        // Configure RigPresets 0, 1, 2 with mock display and audio IDs if empty
+        for (var i = 0; i < Settings.RigPresets.Count; i++)
         {
-            Settings.DeskFallbackAudioId = "{00000000-0000-0000-0000-000000000002}";
-        }
-
-        if (string.IsNullOrEmpty(Settings.RigPrimaryAudioId))
-        {
-            Settings.RigPrimaryAudioId = "{00000000-0000-0000-0000-000000000003}";
+            var preset = Settings.RigPresets[i];
+            preset.TargetMonitorId = string.IsNullOrEmpty(preset.TargetMonitorId) ? Settings.RigMonitorId : preset.TargetMonitorId;
+            preset.PrimaryAudioId = string.IsNullOrEmpty(preset.PrimaryAudioId)
+                ? (i == 1 ? "{00000000-0000-0000-0000-000000000005}" : Settings.RigPrimaryAudioId)
+                : preset.PrimaryAudioId;
+            preset.FallbackAudioId = string.IsNullOrEmpty(preset.FallbackAudioId) ? Settings.DeskFallbackAudioId : preset.FallbackAudioId;
         }
 
         // Default display topology
@@ -65,6 +78,21 @@ public sealed class SimulationDisturbanceContext
             "NVIDIA RTX 4070 Ti",
             isActive: false,
             isPrimary: false));
+
+        foreach (var preset in Settings.DeskPresets.Concat(Settings.RigPresets))
+        {
+            if (!string.IsNullOrEmpty(preset.TargetMonitorId) &&
+                !_displays.Any(d => string.Equals(d.MonitorId, preset.TargetMonitorId, StringComparison.OrdinalIgnoreCase)))
+            {
+                _displays.Add(new DisplayDeviceInfo(
+                    preset.TargetMonitorId,
+                    $@"\\.\DISPLAY_{_displays.Count + 1}",
+                    preset.Name,
+                    "NVIDIA RTX 4070 Ti",
+                    isActive: false,
+                    isPrimary: false));
+            }
+        }
 
         _initialDisplaysBackup.AddRange(_displays);
 
@@ -92,6 +120,37 @@ public sealed class SimulationDisturbanceContext
             DevicePresenceState.Active,
             isDefaultPlayback: false,
             isDefaultCommunications: false));
+
+        _audioEndpoints.Add(new AudioEndpointInfo(
+            "{00000000-0000-0000-0000-000000000004}",
+            "Wireless Headset",
+            "Realtek Audio",
+            DevicePresenceState.Active,
+            isDefaultPlayback: false,
+            isDefaultCommunications: false));
+
+        _audioEndpoints.Add(new AudioEndpointInfo(
+            "{00000000-0000-0000-0000-000000000005}",
+            "Rig Headset",
+            "USB Audio Device",
+            DevicePresenceState.Active,
+            isDefaultPlayback: false,
+            isDefaultCommunications: false));
+
+        foreach (var preset in Settings.DeskPresets.Concat(Settings.RigPresets))
+        {
+            if (!string.IsNullOrEmpty(preset.PrimaryAudioId) &&
+                !_audioEndpoints.Any(e => string.Equals(e.Id, preset.PrimaryAudioId, StringComparison.OrdinalIgnoreCase)))
+            {
+                _audioEndpoints.Add(new AudioEndpointInfo(
+                    preset.PrimaryAudioId,
+                    $"{preset.Name} Audio",
+                    "Audio Adapter",
+                    DevicePresenceState.Active,
+                    isDefaultPlayback: false,
+                    isDefaultCommunications: false));
+            }
+        }
 
         ActiveDefaultAudioId = Settings.DeskPrimaryAudioId;
 
