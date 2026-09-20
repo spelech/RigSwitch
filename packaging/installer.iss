@@ -37,6 +37,7 @@ RestartApplications=no
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupIconFile=..\src\RigSwitch.App\Assets\app.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

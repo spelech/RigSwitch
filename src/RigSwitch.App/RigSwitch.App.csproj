@@ -4,8 +4,13 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\app.png" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RigSwitch.Core\RigSwitch.Core.csproj" />
     <ProjectReference Include="..\RigSwitch.Infrastructure\RigSwitch.Infrastructure.csproj" />
