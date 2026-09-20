@@ -255,4 +255,54 @@ public sealed class ReviewFixesTests
         Assert.NotNull(capturedPaths);
         Assert.Equal(NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE, capturedPaths[0].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE);
     }
+
+    [Fact]
+    public void MainSettingsWindow_CanInstantiateAndShow()
+    {
+        RunInSta(() =>
+        {
+            var coordinator = Substitute.For<IProfileSwitchCoordinator>();
+            var trayIconService = new RigSwitch.App.Services.TrayIconService(coordinator, _settingsService);
+            var vm = new RigSwitch.App.ViewModels.MainSettingsViewModel(
+
+                coordinator,
+                _settingsService,
+                _displayService,
+                _audioDirector,
+                Substitute.For<IGlobalHotkeyService>(),
+                trayIconService);
+
+            var window = new RigSwitch.App.Views.MainSettingsWindow(vm);
+            Assert.NotNull(window);
+            window.Show();
+            window.SetExplicitShutdown();
+            window.Close();
+        });
+    }
+
+
+    private static void RunInSta(Action action)
+    {
+        Exception? exception = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (exception != null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+    }
 }
+
