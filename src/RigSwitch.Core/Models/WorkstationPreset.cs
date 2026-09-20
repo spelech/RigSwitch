@@ -39,4 +39,10 @@ public sealed record WorkstationPreset
     /// Gets or sets application file paths to launch upon activating this preset.
     /// </summary>
     public List<string> LaunchApplicationPaths { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets application lifecycle hooks configured for this preset.
+    /// </summary>
+    public List<PresetApplicationHook> ApplicationHooks { get; set; } = [];
 }
+

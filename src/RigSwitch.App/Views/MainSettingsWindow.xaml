@@ -181,13 +181,46 @@
                               DisplayMemberPath="DisplayName" />
                 </Grid>
 
-                <Grid>
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Direct Hotkey:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
                     <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DirectHotkey, Mode=TwoWay}" Watermark="None (Optional)" />
+                </Grid>
+
+                <!-- Applications & Tools Lifecycle Hooks -->
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Applications &amp; Tools:" VerticalAlignment="Top" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" />
+                    <StackPanel Grid.Column="1">
+                        <ItemsControl ItemsSource="{Binding ApplicationHooks}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:ApplicationHookItemViewModel}">
+                                    <Border Background="{StaticResource DarkBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <CheckBox Grid.Column="1" Content="Close when switching away" IsChecked="{Binding CloseOnSwitchAway, Mode=TwoWay}" VerticalAlignment="Center" Margin="12,0,8,0" FontSize="11" />
+                                            <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}" Padding="6,2" FontSize="11" VerticalAlignment="Center" ToolTip="Remove application hook" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="+ Add Application (.exe)" Command="{Binding AddApplicationHookCommand}" HorizontalAlignment="Left" Padding="10,5" FontSize="12" Margin="0,2,0,0" />
+                    </StackPanel>
                 </Grid>
             </StackPanel>
         </DataTemplate>
