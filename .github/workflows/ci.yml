@@ -6,10 +6,13 @@ on:
       - main
       - develop
       - 'feat/**'
+      - 'release/**'
+      - 'hotfix/**'
   pull_request:
     branches:
       - main
       - develop
+      - 'release/**'
   workflow_dispatch:
 
 concurrency:

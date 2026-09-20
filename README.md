@@ -78,6 +78,20 @@ dotnet run --project src/RigSwitch.App -c Release
 
 ---
 
+## 🔀 Branching Strategy (Git Flow)
+
+RigSwitch follows the **Git Flow** release model:
+
+* **`main`**: Holds the latest stable, production-ready releases.
+* **`develop`**: The primary integration branch where new features and enhancements land.
+* **`feat/<name>`**: Feature branches branched from `develop` and merged back into `develop` via Pull Request.
+* **`release/v<version>`**: Release preparation branches branched from `develop`. When ready, merged into `main` (with a version tag `vX.Y.Z`) and merged back into `develop`.
+* **`hotfix/<name>`**: Urgent fixes branched directly from `main` and merged into both `main` and `develop`.
+
+Pushing any `v*` tag to `main` automatically triggers the GitHub Actions release workflow to compile the installer and publish the GitHub Release.
+
+---
+
 ## 📐 Architecture & Standards
 
 RigSwitch strictly adheres to Steven T. Pelech's **`AgenticEngineeringToolbelt`**:
