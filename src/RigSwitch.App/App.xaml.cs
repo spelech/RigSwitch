@@ -121,7 +121,7 @@ public partial class App : Application
                 });
             };
 
-            bool startMinimized = settings.StartMinimizedToTray;
+            bool startMinimized = settings.StartMinimizedToTray && !e.Args.Contains("--settings") && !e.Args.Contains("--show");
             bool isFirstRunUnconfigured = string.IsNullOrWhiteSpace(settings.DeskMonitorId) && string.IsNullOrWhiteSpace(settings.RigMonitorId);
             if (!startMinimized || isFirstRunUnconfigured)
             {

@@ -372,26 +372,39 @@ public sealed class TrayIconService : IDisposable
 
             if (mode == ProfileMode.Desk)
             {
-                using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(0, 122, 204));
+                using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(10, 10, 14));
+                using var borderPen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(0, 200, 83), 1.5f);
                 g.FillEllipse(bgBrush, 1, 1, 30, 30);
+                g.DrawEllipse(borderPen, 1, 1, 30, 30);
 
-                using var whitePen = new System.Drawing.Pen(System.Drawing.Color.White, 2f);
-                g.DrawRectangle(whitePen, 7, 7, 18, 12);
-                g.DrawLine(whitePen, 16, 19, 16, 23);
-                g.DrawLine(whitePen, 11, 23, 21, 23);
+                using var greenPen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(0, 200, 83), 2f);
+                // Ultrawide curved monitor screen
+                g.DrawArc(greenPen, 6, 7, 20, 13, 10, 160);
+                g.DrawArc(greenPen, 6, 17, 20, 4, 10, 160);
+                g.DrawLine(greenPen, 7, 9, 7, 18);
+                g.DrawLine(greenPen, 25, 9, 25, 18);
+                // Stand
+                g.DrawLine(greenPen, 16, 19, 16, 23);
+                g.DrawLine(greenPen, 11, 23, 21, 23);
             }
             else
             {
-                using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(232, 78, 27));
+                using var bgBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(10, 10, 14));
+                using var borderPen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 85, 0), 1.5f);
                 g.FillEllipse(bgBrush, 1, 1, 30, 30);
+                g.DrawEllipse(borderPen, 1, 1, 30, 30);
 
-                using var whitePen = new System.Drawing.Pen(System.Drawing.Color.White, 2f);
-                using var whiteBrush = new System.Drawing.SolidBrush(System.Drawing.Color.White);
-                g.DrawEllipse(whitePen, 6, 6, 20, 20);
-                g.FillEllipse(whiteBrush, 14, 14, 4, 4);
-                g.DrawLine(whitePen, 6, 16, 14, 16);
-                g.DrawLine(whitePen, 18, 16, 26, 16);
-                g.DrawLine(whitePen, 16, 18, 16, 26);
+                using var orangePen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 85, 0), 2f);
+                using var orangeBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 85, 0));
+                // F1 / GT3 butterfly yoke grips (left and right sculpted handles)
+                g.DrawArc(orangePen, 6, 8, 8, 16, 90, 180);
+                g.DrawArc(orangePen, 18, 8, 8, 16, 270, 180);
+                // Crossbar and center hub
+                g.DrawLine(orangePen, 10, 16, 22, 16);
+                g.FillEllipse(orangeBrush, 14, 14, 4, 4);
+                // Top shift indicator dots
+                g.FillRectangle(orangeBrush, 11, 11, 2, 2);
+                g.FillRectangle(orangeBrush, 19, 11, 2, 2);
             }
         }
 

@@ -11,10 +11,10 @@ using RigSwitch.Core.Services;
 /// </summary>
 public partial class HotkeyRecorderControl : UserControl
 {
-    private static readonly SolidColorBrush AccentBrush = CreateFrozenBrush(0x00, 0x7A, 0xCC);
-    private static readonly SolidColorBrush NormalBorderBrush = CreateFrozenBrush(0x3E, 0x3E, 0x42);
-    private static readonly SolidColorBrush NormalTextBrush = CreateFrozenBrush(0xEC, 0xEC, 0xEC);
-    private static readonly SolidColorBrush MutedTextBrush = CreateFrozenBrush(0x8E, 0x8E, 0x93);
+    private static readonly SolidColorBrush AccentBrush = CreateFrozenBrush(0x00, 0xC8, 0x53);
+    private static readonly SolidColorBrush NormalBorderBrush = CreateFrozenBrush(0x3A, 0x3A, 0x4E);
+    private static readonly SolidColorBrush NormalTextBrush = CreateFrozenBrush(0xFF, 0xFF, 0xFF);
+    private static readonly SolidColorBrush MutedTextBrush = CreateFrozenBrush(0x8E, 0x95, 0xA5);
 
     /// <summary>
     /// Identifies the <see cref="Hotkey"/> dependency property.
