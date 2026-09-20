@@ -111,48 +111,48 @@ public sealed class WindowsNativeHotkeyProvider : INativeHotkeyProvider
         switch (msg)
         {
             case WM_REGISTER_HOTKEY:
-            {
-                int id = wParam.ToInt32();
-                uint packed = (uint)lParam.ToInt64();
-                uint modifiers = packed & 0xFFFF;
-                uint vk = (packed >> 16) & 0xFFFF;
-                bool success = NativeHotkeyApi.RegisterHotKey(hWnd, id, modifiers, vk);
-                return success ? (IntPtr)1 : IntPtr.Zero;
-            }
+                {
+                    int id = wParam.ToInt32();
+                    uint packed = (uint)lParam.ToInt64();
+                    uint modifiers = packed & 0xFFFF;
+                    uint vk = (packed >> 16) & 0xFFFF;
+                    bool success = NativeHotkeyApi.RegisterHotKey(hWnd, id, modifiers, vk);
+                    return success ? (IntPtr)1 : IntPtr.Zero;
+                }
 
             case WM_UNREGISTER_HOTKEY:
-            {
-                int id = wParam.ToInt32();
-                bool success = NativeHotkeyApi.UnregisterHotKey(hWnd, id);
-                return success ? (IntPtr)1 : IntPtr.Zero;
-            }
+                {
+                    int id = wParam.ToInt32();
+                    bool success = NativeHotkeyApi.UnregisterHotKey(hWnd, id);
+                    return success ? (IntPtr)1 : IntPtr.Zero;
+                }
 
             case NativeHotkeyApi.WM_HOTKEY:
-            {
-                int id = wParam.ToInt32();
-                try
                 {
-                    HotkeyPressed?.Invoke(id);
-                }
-                catch
-                {
-                    // Do not allow subscriber exceptions to crash the message loop
-                }
+                    int id = wParam.ToInt32();
+                    try
+                    {
+                        HotkeyPressed?.Invoke(id);
+                    }
+                    catch
+                    {
+                        // Do not allow subscriber exceptions to crash the message loop
+                    }
 
-                return IntPtr.Zero;
-            }
+                    return IntPtr.Zero;
+                }
 
             case NativeHotkeyApi.WM_CLOSE:
-            {
-                NativeHotkeyApi.DestroyWindow(hWnd);
-                return IntPtr.Zero;
-            }
+                {
+                    NativeHotkeyApi.DestroyWindow(hWnd);
+                    return IntPtr.Zero;
+                }
 
             case NativeHotkeyApi.WM_NCDESTROY:
-            {
-                NativeHotkeyApi.PostQuitMessage(0);
-                return IntPtr.Zero;
-            }
+                {
+                    NativeHotkeyApi.PostQuitMessage(0);
+                    return IntPtr.Zero;
+                }
 
             default:
                 return NativeHotkeyApi.DefWindowProcW(hWnd, msg, wParam, lParam);
