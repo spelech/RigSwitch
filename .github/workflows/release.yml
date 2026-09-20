@@ -84,3 +84,14 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
+      - name: Submit to Windows Package Manager (WinGet)
+        uses: vedantmgoyal209/winget-releaser@v2
+        if: ${{ env.WINGET_TOKEN != '' }}
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        with:
+          identifier: spelech.RigSwitch
+          installer-type: inno
+          token: ${{ secrets.WINGET_TOKEN }}
+

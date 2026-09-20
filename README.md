@@ -1,5 +1,6 @@
 # 🚀 RigSwitch
 
+[![Release](https://img.shields.io/github/v/release/spelech/RigSwitch?color=00C853&label=release)](https://github.com/spelech/RigSwitch/releases/latest)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
 [![Tests](https://img.shields.io/badge/tests-241%2F241%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
 [![.NET](https://img.shields.io/badge/.NET-10.0--windows-512BD4.svg)](https://dotnet.microsoft.com/)
@@ -10,6 +11,34 @@
 **RigSwitch** is an ultra-fast, native Windows system tray control plane and workstation orchestrator. It switches instantly between a **Desk Setup** (primary workstation display + desk audio) and a **Sim Rig Setup** (racing simulator / secondary display + rig audio) via global hotkeys or the system tray.
 
 Unlike basic primary display toggles, RigSwitch disables the inactive display at the Win32 CCD driver level, preventing unwanted secondary screen clutter, phantom mouse cursors, and games launching off-screen.
+
+---
+
+## 💾 Installation & Download
+
+### Option 1: Direct Installer (Recommended)
+
+Download the official setup installer from GitHub Releases:
+
+[![Download RigSwitch](https://img.shields.io/badge/Download-RigSwitch--Setup--v1.0.0.exe-00C853?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/spelech/RigSwitch/releases/latest/download/RigSwitch-Setup-v1.0.0.exe)
+
+1. Download [`RigSwitch-Setup-v1.0.0.exe`](https://github.com/spelech/RigSwitch/releases/latest/download/RigSwitch-Setup-v1.0.0.exe).
+2. Run the installer wizard. RigSwitch installs cleanly to `%LOCALAPPDATA%\Programs\RigSwitch` (no administrator privileges required).
+3. Shortcuts are created on your **Desktop** and **Start Menu**.
+4. RigSwitch launches automatically into your system tray and starts on Windows boot.
+
+### Option 2: Windows Package Manager (WinGet)
+
+You can also install or update RigSwitch directly via PowerShell / Windows Terminal:
+
+```powershell
+winget install spelech.RigSwitch
+```
+
+To update an existing installation to the latest release:
+```powershell
+winget upgrade spelech.RigSwitch
+```
 
 ---
 
