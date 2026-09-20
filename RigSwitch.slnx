@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RigSwitch.Core/RigSwitch.Core.csproj" />
+    <Project Path="src/RigSwitch.Infrastructure/RigSwitch.Infrastructure.csproj" />
+    <Project Path="src/RigSwitch.App/RigSwitch.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RigSwitch.Tests.Unit/RigSwitch.Tests.Unit.csproj" />
+    <Project Path="tests/RigSwitch.Tests.Harness/RigSwitch.Tests.Harness.csproj" />
+  </Folder>
+</Solution>
