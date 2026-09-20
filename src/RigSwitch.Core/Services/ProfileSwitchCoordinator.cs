@@ -14,6 +14,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     private readonly IDisplayConfigurationService _displayConfigService;
     private readonly IAudioEndpointDirector _audioDirector;
     private readonly ISettingsStorageService _settingsStorageService;
+    private readonly IApplicationLifecycleHookService? _appHookService;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
 
@@ -24,11 +25,13 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     /// <param name="audioDirector">The audio endpoint director.</param>
     /// <param name="settingsStorageService">The settings storage service.</param>
     /// <param name="initialProfile">The initial workstation profile mode.</param>
+    /// <param name="appHookService">Optional application lifecycle hook service.</param>
     public ProfileSwitchCoordinator(
         IDisplayConfigurationService displayConfigService,
         IAudioEndpointDirector audioDirector,
         ISettingsStorageService settingsStorageService,
-        ProfileMode initialProfile = ProfileMode.Desk)
+        ProfileMode initialProfile = ProfileMode.Desk,
+        IApplicationLifecycleHookService? appHookService = null)
     {
         ArgumentNullException.ThrowIfNull(displayConfigService);
         ArgumentNullException.ThrowIfNull(audioDirector);
@@ -37,6 +40,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         _displayConfigService = displayConfigService;
         _audioDirector = audioDirector;
         _settingsStorageService = settingsStorageService;
+        _appHookService = appHookService;
         CurrentProfile = initialProfile;
     }
 
@@ -83,12 +87,14 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         var previousProfile = CurrentProfile;
+        WorkstationPreset? previousPreset = null;
         WorkstationPreset? preset = null;
 
         try
         {
             // Step 1: Load current settings and resolve target preset
             var settings = await _settingsStorageService.LoadSettingsAsync(cancellationToken).ConfigureAwait(false);
+            previousPreset = settings.GetActivePreset(previousProfile);
 
             if (targetPresetIndex.HasValue)
             {
@@ -159,7 +165,40 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                 }
             }
 
-            // Step 5: State & Settings Persistence
+            // Step 5: Application Lifecycle Hooks
+            if (_appHookService != null)
+            {
+                if (previousPreset != null)
+                {
+                    try
+                    {
+                        await _appHookService.CloseHooksForPresetAsync(previousPreset, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to close application hooks for preset '{previousPreset.Name}': {ex.Message}");
+                    }
+                }
+
+                try
+                {
+                    await _appHookService.LaunchHooksForPresetAsync(preset, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning($"Failed to launch application hooks for preset '{preset.Name}': {ex.Message}");
+                }
+            }
+
+            // Step 6: State & Settings Persistence
             CurrentProfile = targetProfile;
             CurrentPresetIndex = activePresetIndex;
             CurrentPreset = preset;

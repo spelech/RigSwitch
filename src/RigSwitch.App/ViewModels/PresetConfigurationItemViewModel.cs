@@ -1,7 +1,9 @@
 namespace RigSwitch.App.ViewModels;
 
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows.Input;
+using Microsoft.Win32;
 using RigSwitch.Core.Models;
 
 /// <summary>
@@ -16,6 +18,16 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     private string _fallbackAudioId;
     private string _directHotkey;
     private bool _isActive;
+
+    /// <summary>
+    /// Gets the application lifecycle hooks configured for this preset.
+    /// </summary>
+    public ObservableCollection<ApplicationHookItemViewModel> ApplicationHooks { get; } = [];
+
+    /// <summary>
+    /// Gets the command to add a new application lifecycle hook using a file dialog.
+    /// </summary>
+    public ICommand AddApplicationHookCommand { get; }
 
     /// <summary>
     /// Gets the zero-based index of this preset within its profile mode.
@@ -116,13 +128,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     /// <param name="isActive">Whether this preset is initially active.</param>
     /// <param name="onActivated">Optional callback invoked when this preset becomes active.</param>
     /// <param name="openDisplaySettingsAction">Optional custom action to invoke for display settings command.</param>
+    /// <param name="selectFileAction">Optional custom action to select executable file for testing.</param>
     public PresetConfigurationItemViewModel(
         WorkstationPreset preset,
         int presetIndex,
         string groupName,
         bool isActive,
         Action<PresetConfigurationItemViewModel>? onActivated = null,
-        Action? openDisplaySettingsAction = null)
+        Action? openDisplaySettingsAction = null,
+        Func<string?>? selectFileAction = null)
     {
         ArgumentNullException.ThrowIfNull(preset);
         PresetIndex = presetIndex;
@@ -136,7 +150,45 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         _fallbackAudioId = preset.FallbackAudioId;
         _directHotkey = preset.DirectHotkey;
 
+        if (preset.ApplicationHooks != null)
+        {
+            foreach (var hook in preset.ApplicationHooks)
+            {
+                ApplicationHooks.Add(new ApplicationHookItemViewModel(hook, RemoveApplicationHook));
+            }
+        }
+
         OpenDisplaySettingsCommand = new RelayCommand(openDisplaySettingsAction ?? LaunchDisplaySettings);
+        AddApplicationHookCommand = new RelayCommand(() =>
+        {
+            var selectedFile = selectFileAction != null ? selectFileAction() : PromptForExecutablePath();
+            if (!string.IsNullOrWhiteSpace(selectedFile))
+            {
+                var newHook = new PresetApplicationHook
+                {
+                    ExecutablePath = selectedFile,
+                    CloseOnSwitchAway = true
+                };
+                ApplicationHooks.Add(new ApplicationHookItemViewModel(newHook, RemoveApplicationHook));
+            }
+        });
+    }
+
+    private void RemoveApplicationHook(ApplicationHookItemViewModel hook)
+    {
+        ApplicationHooks.Remove(hook);
+    }
+
+    private static string? PromptForExecutablePath()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select Application to Launch",
+            Filter = "Executable Files (*.exe)|*.exe|All Files (*.*)|*.*",
+            CheckFileExists = true
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     /// <summary>
@@ -151,6 +203,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         target.PrimaryAudioId = PrimaryAudioId;
         target.FallbackAudioId = FallbackAudioId;
         target.DirectHotkey = DirectHotkey;
+        target.ApplicationHooks = ApplicationHooks.Select(h => h.ToModel()).ToList();
     }
 
     private static void LaunchDisplaySettings()

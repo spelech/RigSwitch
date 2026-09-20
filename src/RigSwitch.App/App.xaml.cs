@@ -14,6 +14,7 @@ using RigSwitch.Infrastructure.Storage;
 using RigSwitch.Infrastructure.Windows.Ccd;
 using RigSwitch.Infrastructure.Windows.CoreAudio;
 using RigSwitch.Infrastructure.Windows.Hotkeys;
+using RigSwitch.Infrastructure.Windows.Processes;
 using WinForms = System.Windows.Forms;
 using Application = System.Windows.Application;
 
@@ -43,11 +44,13 @@ public partial class App : Application
             builder.Services.AddSingleton<IDisplayConfigurationService>(_ => new WindowsDisplayConfigurationService());
             builder.Services.AddSingleton<IAudioEndpointDirector>(_ => new CoreAudioEndpointDirector());
             builder.Services.AddSingleton<IGlobalHotkeyService>(_ => new WindowsGlobalHotkeyService());
+            builder.Services.AddSingleton<IApplicationLifecycleHookService>(_ => new WindowsApplicationLifecycleHookService());
             builder.Services.AddSingleton<IProfileSwitchCoordinator>(sp =>
                 new ProfileSwitchCoordinator(
                     sp.GetRequiredService<IDisplayConfigurationService>(),
                     sp.GetRequiredService<IAudioEndpointDirector>(),
-                    sp.GetRequiredService<ISettingsStorageService>()));
+                    sp.GetRequiredService<ISettingsStorageService>(),
+                    appHookService: sp.GetRequiredService<IApplicationLifecycleHookService>()));
 
             builder.Services.AddSingleton<TrayIconService>();
             builder.Services.AddSingleton<MainSettingsViewModel>();
