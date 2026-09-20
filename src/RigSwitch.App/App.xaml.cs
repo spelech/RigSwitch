@@ -1,5 +1,6 @@
 namespace RigSwitch.App;
 
+using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +14,7 @@ using RigSwitch.Infrastructure.Storage;
 using RigSwitch.Infrastructure.Windows.Ccd;
 using RigSwitch.Infrastructure.Windows.CoreAudio;
 using RigSwitch.Infrastructure.Windows.Hotkeys;
+using WinForms = System.Windows.Forms;
 using Application = System.Windows.Application;
 
 /// <summary>
@@ -32,6 +34,8 @@ public partial class App : Application
         try
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            WinForms.Application.EnableVisualStyles();
 
             var builder = Host.CreateApplicationBuilder(e.Args);
 
@@ -115,7 +119,8 @@ public partial class App : Application
             };
 
             bool startMinimized = settings.StartMinimizedToTray;
-            if (!startMinimized)
+            bool isFirstRunUnconfigured = string.IsNullOrWhiteSpace(settings.DeskMonitorId) && string.IsNullOrWhiteSpace(settings.RigMonitorId);
+            if (!startMinimized || isFirstRunUnconfigured)
             {
                 ShowSettingsWindow();
             }

@@ -1,13 +1,13 @@
 # 🚀 RigSwitch
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/stevenpelech/RigSwitch/actions)
-[![Tests](https://img.shields.io/badge/tests-97%2F97%20passing-brightgreen.svg)](https://github.com/stevenpelech/RigSwitch/actions)
+[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
+[![Tests](https://img.shields.io/badge/tests-104%2F104%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
 [![.NET](https://img.shields.io/badge/.NET-10.0--windows-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D6.svg)](https://www.microsoft.com/windows)
 [![Toolbelt](https://img.shields.io/badge/standard-AgenticEngineeringToolbelt-6f42c1.svg)](docs/superpowers/specs/2026-09-19-rigswitch-design.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**RigSwitch** is an ultra-fast, native Windows system tray control plane and workstation orchestrator. It switches instantly between a **Desk Setup** (MSI MPG341CX OLED display + Pebble V3 USB audio) and a **Sim Rig Setup** (Asus VG34VQL3A ultrawide display + Asus monitor line-out audio) via global hotkeys or the system tray.
+**RigSwitch** is an ultra-fast, native Windows system tray control plane and workstation orchestrator. It switches instantly between a **Desk Setup** (primary workstation display + desk audio) and a **Sim Rig Setup** (racing simulator / secondary display + rig audio) via global hotkeys or the system tray.
 
 Unlike basic primary display toggles, RigSwitch disables the inactive display at the Win32 CCD driver level, preventing unwanted secondary screen clutter, phantom mouse cursors, and games launching off-screen.
 
@@ -17,11 +17,11 @@ Unlike basic primary display toggles, RigSwitch disables the inactive display at
 
 * 🖥️ **Instant Display Topology Switching**: Leverages low-level Win32 Connecting and Configuring Displays (CCD) APIs (`SetDisplayConfig`) to enable the target screen and disable the inactive screen atomically.
 * 🛡️ **Fail-Safe Safety Gates**: Verifies that the target display is physically connected and recognized by the GPU before altering topology, eliminating black-screen lockout risk.
-* 🔊 **Multi-Tier Audio Fallback**: Routes Windows default playback endpoints via CoreAudio COM (`IPolicyConfig`). Automatically falls back from Creative Pebble V3 USB to MSI monitor audio when the Pebble speakers are unplugged or set to AUX mode.
-* 🧹 **Audio Endpoint Visibility Filter**: Easily hide cluttering virtual endpoints created by SteelSeries Sonar, Oculus VR, or Steam Streaming directly within Windows.
+* 🔊 **Multi-Tier Audio Fallback**: Routes Windows default playback endpoints via CoreAudio COM (`IPolicyConfig`). Automatically falls back to a secondary playback device if primary desk speakers are unplugged or set to AUX mode.
+* 🧹 **Audio Endpoint Visibility Filter**: Easily hide cluttering virtual endpoints created by third-party audio drivers, VR headsets, or streaming devices directly within Windows.
 * ⌨️ **Global Simulator Hotkeys**: Low-level Win32 hotkey hooks that function seamlessly even inside exclusive full-screen racing simulators and games.
 * 📌 **Native System Tray Integration**: Lightweight WPF desktop app running resident in the taskbar with dynamically rendered GDI icons (workstation monitor for Desk mode, racing steering wheel for Sim Rig mode).
-* ⚙️ **Modern Dark-Mode Settings GUI**: Intuitive MVVM interface to customize device nicknames, configure hotkeys, preview hardware IDs, and toggle endpoint visibility.
+* ⚙️ **Modern Dark-Mode Settings GUI**: Intuitive MVVM interface with automatic hardware detection dropdowns to easily select your displays and audio devices, customize nicknames, configure hotkeys, and toggle endpoint visibility.
 
 ---
 
@@ -30,19 +30,21 @@ Unlike basic primary display toggles, RigSwitch disables the inactive display at
 | Hotkey | Action | Description |
 | :--- | :--- | :--- |
 | <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>S</kbd> | **Toggle Profile** | Flips between Desk Setup and Sim Rig Setup |
-| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>D</kbd> | **Desk Setup** | Activates MSI OLED display & routes audio to Pebble V3 (or MSI fallback) |
-| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>R</kbd> | **Sim Rig Setup** | Activates Asus Ultrawide display & routes audio to Asus monitor output |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>D</kbd> | **Desk Setup** | Activates Desk display & routes audio to primary desk endpoint (with fallback) |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>R</kbd> | **Sim Rig Setup** | Activates Sim Rig display & routes audio to rig playback endpoint |
 
 *Hotkeys can be customized at any time via the Settings window.*
 
 ---
 
-## 🎛️ Hardware Profile Mapping
+## 🎛️ Hardware Profile Configuration
 
-| Profile | Active Display | Disabled Display | Primary Audio | Fallback Audio |
+Profiles are configured per PC directly from the Settings GUI. Detected monitors and audio devices appear in dropdown menus:
+
+| Profile | Active Display | Inactive Display | Primary Audio | Fallback Audio |
 | :--- | :--- | :--- | :--- | :--- |
-| **Desk Setup** | `MONITOR\MSI4DD0`<br/>*(MSI MPG341CX OLED)* | `MONITOR\AUS3438`<br/>*(Asus VG34VQL3A)* | `Speakers (Pebble V3)` | `MPG341CX OLED (NVIDIA Audio)` |
-| **Sim Rig Setup** | `MONITOR\AUS3438`<br/>*(Asus VG34VQL3A)* | `MONITOR\MSI4DD0`<br/>*(MSI MPG341CX OLED)* | `VG34VQL3A (NVIDIA Audio)`<br/>*(Pass-through to Pebble V2)* | *None* |
+| **Desk Setup** | Workstation Monitor | Simulator Display | Primary Desk Speakers / DAC | Secondary Audio / Monitor Line-Out |
+| **Sim Rig Setup** | Simulator / Ultrawide Display | Workstation Monitor | Sim Rig Audio / DAC | *(Optional)* |
 
 ---
 
@@ -55,7 +57,7 @@ Unlike basic primary display toggles, RigSwitch disables the inactive display at
 ### Build Solution
 ```powershell
 # Clone the repository
-git clone https://github.com/stevenpelech/RigSwitch.git
+git clone https://github.com/spelech/RigSwitch.git
 cd RigSwitch
 
 # Build the solution in Release configuration (0 warnings, 0 errors)

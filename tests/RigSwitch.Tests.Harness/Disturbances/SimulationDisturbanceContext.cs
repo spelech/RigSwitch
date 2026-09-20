@@ -24,6 +24,31 @@ public sealed class SimulationDisturbanceContext
         RingBuffer = new DiagnosticRingBuffer(100);
         Settings = initialSettings ?? new UserSettings();
 
+        if (string.IsNullOrEmpty(Settings.DeskMonitorId))
+        {
+            Settings.DeskMonitorId = "DESK_MONITOR_1";
+        }
+
+        if (string.IsNullOrEmpty(Settings.RigMonitorId))
+        {
+            Settings.RigMonitorId = "RIG_MONITOR_1";
+        }
+
+        if (string.IsNullOrEmpty(Settings.DeskPrimaryAudioId))
+        {
+            Settings.DeskPrimaryAudioId = "{00000000-0000-0000-0000-000000000001}";
+        }
+
+        if (string.IsNullOrEmpty(Settings.DeskFallbackAudioId))
+        {
+            Settings.DeskFallbackAudioId = "{00000000-0000-0000-0000-000000000002}";
+        }
+
+        if (string.IsNullOrEmpty(Settings.RigPrimaryAudioId))
+        {
+            Settings.RigPrimaryAudioId = "{00000000-0000-0000-0000-000000000003}";
+        }
+
         // Default display topology
         _displays.Add(new DisplayDeviceInfo(
             Settings.DeskMonitorId,

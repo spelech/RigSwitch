@@ -8,10 +8,10 @@
 
 ## 1. Executive Summary & Purpose
 
-**RigSwitch** is an ultra-low-latency Windows desktop control plane and system tray utility designed to execute atomic hardware transitions between two specialized workstation profiles:
+**RigSwitch** is an ultra-low-latency Windows desktop control plane and system tray utility designed to execute atomic hardware transitions between two user-configured workstation profiles:
 
-1. **Desk Setup**: Primary MSI MPG341CX OLED display active; Sim Rig display disabled in Windows topology; default playback routed to Desk Creative Pebble V3 USB audio with automatic fallback to MSI monitor audio when Pebble V3 is unplugged or switched to AUX.
-2. **Sim Rig Setup**: Primary Asus VG34VQL3A ultrawide display active; Desk OLED display disabled in Windows topology; default playback routed to Asus high-definition display audio (feeding Pebble V2 via 3.5mm line-out).
+1. **Desk Setup**: Primary workstation display active; secondary/simulator display disabled in Windows topology; default playback routed to primary desk audio with automatic fallback to secondary audio when unplugged or offline.
+2. **Sim Rig Setup**: Simulator or secondary display active; workstation display disabled in Windows topology; default playback routed to dedicated rig audio.
 
 By directly leveraging Win32 Connecting and Configuring Displays (CCD) APIs and CoreAudio COM interfaces, RigSwitch eliminates the need for physical monitor power cycling, prevents phantom displays, and ensures games launch reliably on the intended screen.
 
@@ -22,7 +22,7 @@ By directly leveraging Win32 Connecting and Configuring Displays (CCD) APIs and 
 RigSwitch is constructed under the rigorous discipline of Steven T. Pelech's `AgenticEngineeringToolbelt`:
 
 * **Zero Junk Drawers (Anti-Bloat Policy)**: Strict ban on amorphous `*Manager`, `*Helper`, or `*Util` catch-all classes. Every component has a single, well-bounded domain responsibility (e.g., `ProfileSwitchCoordinator`, `TrayIconService`, `JsonSettingsStorageService`).
-* **Strict File Size Ceiling**: Every file across all source and test projects is strictly capped at `< 500` lines of code (with actual max file length $\le 368$ lines).
+* **Strict File Size Ceiling**: Every file across all source and test projects is strictly capped at `< 500` lines of code.
 * **Fail-Safe Safety Gates**: Before disabling an active display, the coordinator validates that the target display is physically connected and detected by the GPU driver. If missing, the transition safely aborts without leaving the user on a black screen.
 * **Atomic State Persistence**: Configuration state in `%APPDATA%\RigSwitch\settings.json` is written via write-to-temp and atomic rename (`File.Move(temp, target, overwrite: true)`) to prevent corrupted or partial file writes.
 * **Decoupled Interfaces by Default**: All core and platform services expose explicit `I*` contracts (`IDisplayConfigurationService`, `IAudioEndpointDirector`, `IGlobalHotkeyService`, `IProfileSwitchCoordinator`, `ISettingsStorageService`), enabling test isolation.
@@ -55,10 +55,10 @@ flowchart TD
     end
 
     subgraph Hardware_Plane["Physical Hardware Plane"]
-        DeskDisplay["Desk Display<br/><i>MSI MPG341CX OLED (MSI4DD0)</i>"]
-        RigDisplay["Sim Rig Display<br/><i>Asus VG34VQL3A (AUS3438)</i>"]
-        DeskAudio["Desk Audio<br/><i>Pebble V3 USB / MSI OLED Fallback</i>"]
-        RigAudio["Rig Audio<br/><i>Asus Monitor Line-Out (VG34VQL3A)</i>"]
+        DeskDisplay["Workstation Display<br/><i>User Configured Monitor</i>"]
+        RigDisplay["Sim Rig Display<br/><i>User Configured Monitor</i>"]
+        DeskAudio["Desk Audio<br/><i>Primary & Fallback Endpoints</i>"]
+        RigAudio["Sim Rig Audio<br/><i>Dedicated Rig Playback</i>"]
     end
 
     Tray --> Coordinator
@@ -78,30 +78,20 @@ flowchart TD
 
 ---
 
-## 4. Hardware Device Catalog & State Mapping
+## 4. Hardware Profile Configuration & Device Mapping
 
-RigSwitch maps hardware devices detected via Win32 CCD and PnP queries:
+Hardware device assignments are fully configurable and detected automatically by RigSwitch:
 
-### Workstation Profile Hardware Mapping
+### Profile Role Mapping
 
 | Profile | Active Display (Enabled) | Inactive Display (Disabled) | Primary Audio Endpoint | Fallback Audio Endpoint |
 | :--- | :--- | :--- | :--- | :--- |
-| **Desk Setup** | `MONITOR\MSI4DD0`<br/>(MSI MPG341CX OLED) | `MONITOR\AUS3438`<br/>(Asus VG34VQL3A) | `Speakers (Pebble V3)`<br/>`{D2B56B79-F353-4FB0-81B6-ECEF8E95E57A}` | `MPG341CX OLED (NVIDIA Audio)`<br/>`{EE0329B0-FA5C-4731-B0F1-8E188AB441DC}` |
-| **Sim Rig Setup** | `MONITOR\AUS3438`<br/>(Asus VG34VQL3A) | `MONITOR\MSI4DD0`<br/>(MSI MPG341CX OLED) | `VG34VQL3A (NVIDIA Audio)`<br/>`{3CF792EA-E074-4D66-A8A1-9C4F1A8B204F}` | *None (Direct pass-through to Pebble V2 via 3.5mm)* |
+| **Desk Setup** | Configured Workstation Monitor | Configured Sim Rig Monitor | Primary Desk Playback Device | Fallback Audio Device |
+| **Sim Rig Setup** | Configured Sim Rig Monitor | Configured Workstation Monitor | Primary Rig Playback Device | *(Optional)* |
 
-### Managed / Unwanted Virtual Endpoints (Default Hidden)
+### Endpoint Visibility Control
 
-RigSwitch allows users to hide cluttering virtual endpoints created by third-party audio drivers:
-
-| Friendly Device Name | Windows MMDevice Endpoint ID | Default State |
-| :--- | :--- | :--- |
-| `SteelSeries Sonar - Gaming` | `{4C84EB15-46E9-47BE-BC9B-BB93C43FFCA8}` | Hidden |
-| `SteelSeries Sonar - Chat` | `{E32080F3-4D16-48D8-934B-13ED01E7D0E6}` | Hidden |
-| `SteelSeries Sonar - Media` | `{5EB8AEAD-C887-4D10-8816-CCB6878A3F40}` | Hidden |
-| `SteelSeries Sonar - Aux` | `{E4620821-5066-4BE1-A337-5A303AA1950A}` | Hidden |
-| `SteelSeries Sonar - Microphone` | `{B95DCEBE-55B7-4BB6-BF9F-EEEA0C634D12}` | Hidden |
-| `Headphones (Oculus Virtual Audio Device)` | `{AF3E716C-A16E-49C0-80DD-9E474E054079}` | Hidden |
-| `Speakers (Steam Streaming Speakers)` | `{21F218E9-3A8C-4783-B529-D45EABD58BAB}` | Hidden |
+Users can hide cluttering or unused virtual audio devices (such as virtual channels, VR audio devices, or streaming drivers) directly from the Audio Visibility settings tab.
 
 ---
 
@@ -134,12 +124,12 @@ sequenceDiagram
         Note over Coord,Audio: Phase 2: Audio Endpoint Resolution & Fallback Routing
         Coord->>Audio: EnumerateAudioEndpointsAsync(ct)
         Audio-->>Coord: Return active/unplugged/disabled endpoints
-        alt Desk Profile: Primary Pebble V3 is Active
-            Coord->>Audio: SetDefaultPlaybackEndpointAsync(PebbleV3_Id, ct)
-        else Desk Profile: Pebble V3 is Unplugged / Inactive
-            Coord->>Audio: SetDefaultPlaybackEndpointAsync(MsiOled_Id, ct) (Fallback)
+        alt Desk Profile: Primary Audio is Active
+            Coord->>Audio: SetDefaultPlaybackEndpointAsync(PrimaryDeskAudio_Id, ct)
+        else Desk Profile: Primary Audio is Unplugged / Inactive
+            Coord->>Audio: SetDefaultPlaybackEndpointAsync(FallbackAudio_Id, ct)
         else Sim Rig Profile
-            Coord->>Audio: SetDefaultPlaybackEndpointAsync(AsusRig_Id, ct)
+            Coord->>Audio: SetDefaultPlaybackEndpointAsync(RigAudio_Id, ct)
         end
         Coord->>Audio: SetEndpointVisibilityAsync(HiddenAudioEndpointIds, isVisible: false, ct)
     end
@@ -162,7 +152,7 @@ RigSwitch/
 ├── Directory.Build.props              # Global compiler properties (<Nullable>, <TreatWarningsAsErrors>)
 ├── RigSwitch.slnx                     # Modern XML solution file linking all 5 projects
 ├── ARCHITECTURE.md                    # Living architectural documentation & design specification
-├── README.md                          # Project quickstart, hardware mapping & usage guide
+├── README.md                          # Project quickstart, configuration & usage guide
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                     # 4-stage GitHub Actions verification pipeline
@@ -174,18 +164,18 @@ RigSwitch/
 │   │   ├── Models/                    # DisplayDeviceInfo, AudioEndpointInfo, UserSettings, ProfileChangedEventArgs
 │   │   └── Services/                  # ProfileSwitchCoordinator
 │   ├── RigSwitch.Infrastructure/      # Hardware and OS platform integration (net10.0-windows)
-│   │   ├── Windows/Ccd/               # NativeCcdApi, INativeCcdApi, WindowsNativeCcdApi, WindowsDisplayConfigurationService
+│   │   ├── Windows/Ccd/               # NativeCcdApi, INativeCcdProvider, WindowsNativeCcdProvider, WindowsDisplayConfigurationService
 │   │   ├── Windows/CoreAudio/         # ComInterfaces, INativeAudioProvider, WindowsNativeAudioProvider, CoreAudioEndpointDirector
 │   │   ├── Windows/Hotkeys/           # NativeHotkeyApi, INativeHotkeyProvider, WindowsNativeHotkeyProvider, WindowsGlobalHotkeyService
 │   │   └── Storage/                   # JsonSettingsStorageService
 │   └── RigSwitch.App/                 # Desktop presentation and entry point (net10.0-windows, WPF)
 │       ├── App.xaml / App.xaml.cs     # HostApplicationBuilder DI initialization & tray lifecycle
 │       ├── Services/                  # TrayIconService (NotifyIcon & GDI icon rendering)
-│       ├── ViewModels/                # ViewModelBase, RelayCommand, MainSettingsViewModel,
+│       ├── ViewModels/                # ViewModelBase, RelayCommand, MainSettingsViewModel, DeviceSelectionOption,
 │       │                              # AudioEndpointVisibilityItemViewModel, DeviceNicknameItemViewModel
 │       └── Views/                     # MainSettingsWindow.xaml, MainSettingsWindow.xaml.cs
 └── tests/
-    ├── RigSwitch.Tests.Unit/          # 88 comprehensive unit tests across domain, CCD, CoreAudio, and MVVM
+    ├── RigSwitch.Tests.Unit/          # 95 comprehensive unit tests across domain, CCD, CoreAudio, and MVVM
     └── RigSwitch.Tests.Harness/       # 9 controls-grade stress tests with disturbance injection & ring buffer
 ```
 
@@ -198,18 +188,18 @@ The solution incorporates a controls-grade simulation harness (`RigSwitch.Tests.
 * **Diagnostic Ring Buffer (`DiagnosticRingBuffer.cs`)**: Fixed-size, thread-safe circular array (capacity 100) logging transitions, thread IDs, timestamps, and step outcomes. Snapshots unroll in chronological order for deterministic post-mortem debugging.
 * **Disturbance Injection**:
   * `MonitorUnpluggedDisturbance`: Simulates abrupt physical monitor disconnection, verifying that the coordinator safety gate halts execution before disabling the remaining screen.
-  * `AudioFallbackDisturbance`: Toggles Pebble V3 presence during rapid profile switching to confirm seamless failover to MSI OLED audio.
+  * `AudioFallbackDisturbance`: Toggles primary audio endpoint presence during rapid profile switching to confirm seamless failover to fallback audio.
 * **6-Part Agent Feedback Envelope**: Any simulation disturbance or gate violation generates a structured diagnostic payload:
   ```json
   {
     "inputs": { "target_profile": "SimRig", "cancellation_requested": false },
-    "active_settings": { "desk_monitor": "MSI4DD0", "rig_monitor": "AUS3438" },
+    "active_settings": { "desk_monitor": "DESK_MONITOR_1", "rig_monitor": "RIG_MONITOR_1" },
     "action_history": [
       { "step": 1, "action": "EnumerateDisplays", "result": "Success" },
       { "step": 2, "action": "VerifyTargetDisplayPresent", "result": "Failed: Target display not detected" }
     ],
     "output_delta": { "expected_state": "SimRig", "actual_state": "Desk" },
-    "captured_logs": [ "[SAFETY GATE] Target monitor AUS3438 not detected. Aborting profile switch to prevent black screen." ],
+    "captured_logs": [ "[SAFETY GATE] Target monitor not detected. Aborting profile switch to prevent black screen." ],
     "reproduction_command": "dotnet test tests/RigSwitch.Tests.Harness --filter FullyQualifiedName~SimulationStressTests"
   }
   ```

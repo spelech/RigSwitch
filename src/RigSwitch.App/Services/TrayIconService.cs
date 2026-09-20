@@ -1,17 +1,21 @@
 namespace RigSwitch.App.Services;
 
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 
 /// <summary>
 /// Manages the Windows taskbar system tray icon, context menu, and balloon notifications.
+/// The <see cref="NotifyIcon"/> is created and owned on a dedicated WinForms STA pump thread
+/// so that Windows delivers tray icon messages correctly.
 /// </summary>
 public sealed class TrayIconService : IDisposable
 {
     private readonly IProfileSwitchCoordinator _coordinator;
     private NotifyIcon? _notifyIcon;
+    private Control? _invoker;
     private Action? _openSettingsAction;
     private bool _disposed;
 
@@ -31,7 +35,7 @@ public sealed class TrayIconService : IDisposable
     }
 
     /// <summary>
-    /// Initializes and displays the system tray icon with context menu actions.
+    /// Initializes and displays the system tray icon on a dedicated WinForms STA thread.
     /// </summary>
     /// <param name="openSettingsAction">Action invoked when settings are requested.</param>
     public void Initialize(Action openSettingsAction)
@@ -39,114 +43,130 @@ public sealed class TrayIconService : IDisposable
         ArgumentNullException.ThrowIfNull(openSettingsAction);
         _openSettingsAction = openSettingsAction;
 
-        var contextMenu = new ContextMenuStrip();
+        using var ready = new ManualResetEventSlim(false);
 
-        var deskMenuItem = new ToolStripMenuItem("🖥️ Switch to Desk Setup", null, (s, e) =>
+        var thread = new Thread(() =>
         {
-            _ = Task.Run(async () =>
-            {
-                await _coordinator.SwitchProfileAsync(ProfileMode.Desk).ConfigureAwait(false);
-            });
-        });
+            // Hidden Control gives us a thread-affine Invoke handle for cross-thread marshalling.
+            _invoker = new Control();
+            _invoker.CreateControl();
 
-        var rigMenuItem = new ToolStripMenuItem("🏎️ Switch to Sim Rig Setup", null, (s, e) =>
-        {
-            _ = Task.Run(async () =>
-            {
-                await _coordinator.SwitchProfileAsync(ProfileMode.SimRig).ConfigureAwait(false);
-            });
-        });
+            var contextMenu = new ContextMenuStrip();
 
-        var separator = new ToolStripSeparator();
-
-        var settingsMenuItem = new ToolStripMenuItem("⚙️ Settings...", null, (s, e) =>
-        {
-            _openSettingsAction?.Invoke();
-        });
-
-        var exitMenuItem = new ToolStripMenuItem("❌ Exit RigSwitch", null, (s, e) =>
-        {
-            System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
-            {
-                System.Windows.Application.Current.Shutdown();
-            });
-        });
-
-        contextMenu.Items.AddRange(
-        [
-            deskMenuItem,
-            rigMenuItem,
-            separator,
-            settingsMenuItem,
-            exitMenuItem
-        ]);
-
-        _notifyIcon = new NotifyIcon
-        {
-            ContextMenuStrip = contextMenu,
-            Visible = true
-        };
-
-        _notifyIcon.MouseClick += (sender, e) =>
-        {
-            if (e.Button == MouseButtons.Left)
+            var deskMenuItem = new ToolStripMenuItem("🖥️ Switch to Desk Setup", null, (s, e) =>
             {
                 _ = Task.Run(async () =>
                 {
-                    var nextProfile = _coordinator.CurrentProfile == ProfileMode.Desk
-                        ? ProfileMode.SimRig
-                        : ProfileMode.Desk;
-                    await _coordinator.SwitchProfileAsync(nextProfile).ConfigureAwait(false);
+                    await _coordinator.SwitchProfileAsync(ProfileMode.Desk).ConfigureAwait(false);
                 });
-            }
-        };
+            });
 
-        UpdateTrayState(_coordinator.CurrentProfile);
+            var rigMenuItem = new ToolStripMenuItem("🏎️ Switch to Sim Rig Setup", null, (s, e) =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    await _coordinator.SwitchProfileAsync(ProfileMode.SimRig).ConfigureAwait(false);
+                });
+            });
+
+            var separator = new ToolStripSeparator();
+
+            var settingsMenuItem = new ToolStripMenuItem("⚙️ Settings...", null, (s, e) =>
+            {
+                _openSettingsAction?.Invoke();
+            });
+
+            var exitMenuItem = new ToolStripMenuItem("❌ Exit RigSwitch", null, (s, e) =>
+            {
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    System.Windows.Application.Current.Shutdown();
+                });
+            });
+
+            contextMenu.Items.AddRange(
+            [
+                deskMenuItem,
+                rigMenuItem,
+                separator,
+                settingsMenuItem,
+                exitMenuItem
+            ]);
+
+            _notifyIcon = new NotifyIcon
+            {
+                ContextMenuStrip = contextMenu,
+                Visible = true
+            };
+
+            _notifyIcon.MouseClick += (sender, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        var nextProfile = _coordinator.CurrentProfile == ProfileMode.Desk
+                            ? ProfileMode.SimRig
+                            : ProfileMode.Desk;
+                        await _coordinator.SwitchProfileAsync(nextProfile).ConfigureAwait(false);
+                    });
+                }
+            };
+
+            ApplyTrayState(_coordinator.CurrentProfile);
+            ready.Set();
+
+            // Drive the WinForms message loop so the tray icon receives Windows messages.
+            Application.Run();
+        })
+        {
+            IsBackground = true,
+            Name = "TrayIconPump"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        // Block until the icon and invoker are fully created on the STA thread.
+        ready.Wait();
     }
 
     /// <summary>
     /// Updates the system tray icon image and tooltip to reflect the active profile.
+    /// Thread-safe — marshals to the tray icon's STA thread.
     /// </summary>
     /// <param name="mode">The active workstation profile mode.</param>
     public void UpdateTrayState(ProfileMode mode)
     {
-        if (_notifyIcon == null)
+        if (_invoker == null || _notifyIcon == null)
         {
             return;
         }
 
-        if (System.Windows.Application.Current?.Dispatcher?.CheckAccess() == false)
+        if (_invoker.InvokeRequired)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => UpdateTrayState(mode));
+            _invoker.Invoke(() => ApplyTrayState(mode));
             return;
         }
 
-        var oldIcon = _notifyIcon.Icon;
-        var newIcon = CreateProfileIcon(mode);
-
-        _notifyIcon.Icon = newIcon;
-        _notifyIcon.Text = mode == ProfileMode.Desk
-            ? "RigSwitch - Desk Setup"
-            : "RigSwitch - Sim Rig Setup";
-
-        oldIcon?.Dispose();
+        ApplyTrayState(mode);
     }
 
     /// <summary>
     /// Displays a Windows system balloon tip notification if enabled in user settings.
+    /// Thread-safe — marshals to the tray icon's STA thread.
     /// </summary>
     /// <param name="title">Notification title.</param>
     /// <param name="message">Notification body text.</param>
     public void ShowNotification(string title, string message)
     {
-        if (!ShowToastNotifications || _notifyIcon == null)
+        if (!ShowToastNotifications || _notifyIcon == null || _invoker == null)
         {
             return;
         }
 
-        if (System.Windows.Application.Current?.Dispatcher?.CheckAccess() == false)
+        if (_invoker.InvokeRequired)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => ShowNotification(title, message));
+            _invoker.Invoke(() => _notifyIcon.ShowBalloonTip(3000, title, message, ToolTipIcon.Info));
             return;
         }
 
@@ -163,14 +183,39 @@ public sealed class TrayIconService : IDisposable
 
         _disposed = true;
 
-        if (_notifyIcon != null)
+        if (_invoker != null && _notifyIcon != null)
         {
-            _notifyIcon.Visible = false;
-            _notifyIcon.ContextMenuStrip?.Dispose();
-            _notifyIcon.Icon?.Dispose();
-            _notifyIcon.Dispose();
-            _notifyIcon = null;
+            _invoker.Invoke(() =>
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.ContextMenuStrip?.Dispose();
+                _notifyIcon.Icon?.Dispose();
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+                Application.ExitThread();
+            });
         }
+
+        _invoker?.Dispose();
+        _invoker = null;
+    }
+
+    private void ApplyTrayState(ProfileMode mode)
+    {
+        if (_notifyIcon == null)
+        {
+            return;
+        }
+
+        var oldIcon = _notifyIcon.Icon;
+        var newIcon = CreateProfileIcon(mode);
+
+        _notifyIcon.Icon = newIcon;
+        _notifyIcon.Text = mode == ProfileMode.Desk
+            ? "RigSwitch - Desk Setup"
+            : "RigSwitch - Sim Rig Setup";
+
+        oldIcon?.Dispose();
     }
 
     private static System.Drawing.Icon CreateProfileIcon(ProfileMode mode)

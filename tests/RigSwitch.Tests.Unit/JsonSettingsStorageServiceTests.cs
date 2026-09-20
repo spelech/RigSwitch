@@ -48,18 +48,18 @@ public sealed class JsonSettingsStorageServiceTests : IDisposable
         Assert.True(Directory.Exists(settingsDirectory));
         Assert.NotNull(settings);
         Assert.Equal(ProfileMode.Desk, settings.LastActiveProfile);
-        Assert.Equal("MSI4DD0", settings.DeskMonitorId);
-        Assert.Equal("AUS3438", settings.RigMonitorId);
-        Assert.Equal("{D2B56B79-F353-4FB0-81B6-ECEF8E95E57A}", settings.DeskPrimaryAudioId);
-        Assert.Equal("{EE0329B0-FA5C-4731-B0F1-8E188AB441DC}", settings.DeskFallbackAudioId);
-        Assert.Equal("{3CF792EA-E074-4D66-A8A1-9C4F1A8B204F}", settings.RigPrimaryAudioId);
+        Assert.Equal(string.Empty, settings.DeskMonitorId);
+        Assert.Equal(string.Empty, settings.RigMonitorId);
+        Assert.Equal(string.Empty, settings.DeskPrimaryAudioId);
+        Assert.Equal(string.Empty, settings.DeskFallbackAudioId);
+        Assert.Equal(string.Empty, settings.RigPrimaryAudioId);
         Assert.Equal("Ctrl+Alt+S", settings.ToggleHotkey);
         Assert.Equal("Ctrl+Alt+D", settings.DeskHotkey);
         Assert.Equal("Ctrl+Alt+R", settings.RigHotkey);
         Assert.True(settings.StartMinimizedToTray);
         Assert.True(settings.ShowToastNotifications);
         Assert.Empty(settings.CustomDeviceNames);
-        Assert.Equal(7, settings.HiddenAudioEndpointIds.Count);
+        Assert.Empty(settings.HiddenAudioEndpointIds);
     }
 
     [Fact]
@@ -134,8 +134,8 @@ public sealed class JsonSettingsStorageServiceTests : IDisposable
         // Assert
         Assert.NotNull(settings);
         Assert.Equal(ProfileMode.Desk, settings.LastActiveProfile);
-        Assert.Equal("MSI4DD0", settings.DeskMonitorId);
-        Assert.Equal("AUS3438", settings.RigMonitorId);
+        Assert.Equal(string.Empty, settings.DeskMonitorId);
+        Assert.Equal(string.Empty, settings.RigMonitorId);
     }
 
     [Fact]

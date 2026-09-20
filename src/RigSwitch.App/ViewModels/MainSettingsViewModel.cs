@@ -41,6 +41,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<DisplayDeviceInfo> DetectedDisplays { get; } = [];
     public ObservableCollection<AudioEndpointInfo> DetectedAudioEndpoints { get; } = [];
+    public ObservableCollection<DeviceSelectionOption> AvailableDisplayOptions { get; } = [];
+    public ObservableCollection<DeviceSelectionOption> AvailableAudioOptions { get; } = [];
     public ObservableCollection<DeviceNicknameItemViewModel> DeviceNicknames { get; } = [];
     public ObservableCollection<AudioEndpointVisibilityItemViewModel> AudioEndpointsVisibility { get; } = [];
 
@@ -149,6 +151,41 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             {
                 DetectedAudioEndpoints.Add(a);
             }
+
+            AvailableDisplayOptions.Clear();
+            AvailableDisplayOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Display (Unassigned) —"));
+            foreach (var d in displays)
+            {
+                var stateTag = d.IsPrimary ? " (Primary)" : (d.IsActive ? " (Active)" : "");
+                var label = string.IsNullOrWhiteSpace(d.FriendlyName)
+                    ? d.MonitorId
+                    : $"{d.FriendlyName} [{d.MonitorId}]{stateTag}";
+                AvailableDisplayOptions.Add(new DeviceSelectionOption(d.MonitorId, label));
+            }
+
+            if (!string.IsNullOrWhiteSpace(DeskMonitorId) && !AvailableDisplayOptions.Any(opt => opt.Id == DeskMonitorId))
+            {
+                AvailableDisplayOptions.Add(new DeviceSelectionOption(DeskMonitorId, $"{DeskMonitorId} (Saved / Disconnected)"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(RigMonitorId) && !AvailableDisplayOptions.Any(opt => opt.Id == RigMonitorId))
+            {
+                AvailableDisplayOptions.Add(new DeviceSelectionOption(RigMonitorId, $"{RigMonitorId} (Saved / Disconnected)"));
+            }
+
+            AvailableAudioOptions.Clear();
+            AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio (None) —"));
+            foreach (var a in audioEndpoints)
+            {
+                var label = string.IsNullOrWhiteSpace(a.AdapterDescription)
+                    ? a.Name
+                    : $"{a.Name} ({a.AdapterDescription})";
+                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, label));
+            }
+
+            DeskPrimaryAudioId = ResolveAudioOption(DeskPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
+            DeskFallbackAudioId = ResolveAudioOption(DeskFallbackAudioId, audioEndpoints, AvailableAudioOptions);
+            RigPrimaryAudioId = ResolveAudioOption(RigPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
 
             DeviceNicknames.Clear();
             foreach (var d in displays)
@@ -375,6 +412,27 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
 
         return false;
+    }
+
+    private static string ResolveAudioOption(string targetId, IEnumerable<AudioEndpointInfo> endpoints, ObservableCollection<DeviceSelectionOption> options)
+    {
+        if (string.IsNullOrWhiteSpace(targetId))
+        {
+            return string.Empty;
+        }
+
+        var match = endpoints.FirstOrDefault(a => MatchesEndpoint(a.Id, targetId));
+        if (match != null)
+        {
+            return match.Id;
+        }
+
+        if (!options.Any(opt => opt.Id == targetId))
+        {
+            options.Add(new DeviceSelectionOption(targetId, $"{targetId} (Saved / Disconnected)"));
+        }
+
+        return targetId;
     }
 
     private void OnProfileChanged(object? sender, ProfileChangedEventArgs e)

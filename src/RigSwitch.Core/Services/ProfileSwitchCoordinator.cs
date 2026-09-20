@@ -74,6 +74,13 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                 : settings.DeskMonitorId;
 
             // Step 3: Safety Gate (Reachability Verification)
+            if (string.IsNullOrWhiteSpace(targetMonitorId))
+            {
+                var errorMsg = $"No target display configured for profile '{targetProfile}'. Please select your display in Settings.";
+                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, success: false, errorMessage: errorMsg));
+                return false;
+            }
+
             var displays = await _displayConfigService.EnumerateDisplaysAsync(cancellationToken).ConfigureAwait(false);
             var isTargetPresent = IsDisplayConnected(targetMonitorId, displays);
 
