@@ -44,9 +44,29 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     public ProfileMode CurrentProfile { get; private set; }
 
     /// <inheritdoc />
+    public int CurrentPresetIndex { get; private set; }
+
+    /// <inheritdoc />
+    public WorkstationPreset CurrentPreset { get; private set; } = new();
+
+    /// <inheritdoc />
     public void SetCurrentProfile(ProfileMode profile)
     {
         CurrentProfile = profile;
+    }
+
+    /// <inheritdoc />
+    public void SetCurrentPreset(ProfileMode profile, int presetIndex)
+    {
+        CurrentProfile = profile;
+        CurrentPresetIndex = presetIndex;
+    }
+
+    /// <inheritdoc />
+    public Task<bool> SwitchToPresetAsync(ProfileMode targetProfile, int presetIndex, CancellationToken cancellationToken = default)
+    {
+        SetCurrentPreset(targetProfile, presetIndex);
+        return SwitchProfileAsync(targetProfile, cancellationToken);
     }
 
     /// <inheritdoc />
