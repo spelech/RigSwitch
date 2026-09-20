@@ -20,6 +20,25 @@ public partial class MainSettingsWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        try
+        {
+            if (Environment.ProcessPath != null)
+            {
+                using var sysIcon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath);
+                if (sysIcon != null)
+                {
+                    Icon = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                        sysIcon.Handle,
+                        Int32Rect.Empty,
+                        System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                }
+            }
+        }
+        catch
+        {
+            // Fallback gracefully without throwing
+        }
+
         Loaded += async (sender, args) =>
         {
             await viewModel.LoadAsync();
