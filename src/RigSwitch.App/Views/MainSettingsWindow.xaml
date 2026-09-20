@@ -6,26 +6,32 @@
         xmlns:vm="clr-namespace:RigSwitch.App.ViewModels"
         xmlns:ctrl="clr-namespace:RigSwitch.App.Controls"
         mc:Ignorable="d"
-        Title="RigSwitch Settings"
-        Width="740"
-        Height="580"
-        MinWidth="680"
-        MinHeight="500"
+        Title="RigSwitch — Workstation &amp; Sim Rig Hardware Controller"
+        Width="780"
+        Height="620"
+        MinWidth="700"
+        MinHeight="540"
         WindowStartupLocation="CenterScreen"
-        Background="#1E1E1E"
-        Foreground="#ECECEC"
+        Background="#050507"
+        Foreground="#F4F4F6"
+        FontFamily="Segoe UI Variable Text, Segoe UI, sans-serif"
         d:DataContext="{d:DesignInstance Type=vm:MainSettingsViewModel}">
 
     <Window.Resources>
-        <!-- Colors -->
-        <SolidColorBrush x:Key="DarkBg" Color="#1E1E1E" />
-        <SolidColorBrush x:Key="PanelBg" Color="#252526" />
-        <SolidColorBrush x:Key="ControlBg" Color="#2D2D30" />
-        <SolidColorBrush x:Key="BorderBrushColor" Color="#3E3E42" />
-        <SolidColorBrush x:Key="AccentBlue" Color="#007ACC" />
-        <SolidColorBrush x:Key="AccentRig" Color="#E84E1B" />
-        <SolidColorBrush x:Key="TextPrimary" Color="#ECECEC" />
-        <SolidColorBrush x:Key="TextMuted" Color="#8E8E93" />
+        <!-- Pure OLED Dark & Motorsport Telemetry Palette -->
+        <SolidColorBrush x:Key="OledBaseBg" Color="#050507" />
+        <SolidColorBrush x:Key="OledCardBg" Color="#0D0D11" />
+        <SolidColorBrush x:Key="OledControlBg" Color="#15151B" />
+        <SolidColorBrush x:Key="OledBorder" Color="#22222D" />
+        <SolidColorBrush x:Key="OledBorderBright" Color="#343444" />
+        
+        <!-- Accents: Electric Emerald Green (Desk) & Racing Orange (Sim Rig) -->
+        <SolidColorBrush x:Key="AccentGreen" Color="#00E676" />
+        <SolidColorBrush x:Key="AccentOrange" Color="#FF5E1A" />
+        <SolidColorBrush x:Key="AccentRig" Color="#FF5E1A" />
+        <SolidColorBrush x:Key="AccentDesk" Color="#00E676" />
+        <SolidColorBrush x:Key="TextPrimary" Color="#F4F4F6" />
+        <SolidColorBrush x:Key="TextMuted" Color="#828896" />
 
         <!-- Base Styles -->
         <Style TargetType="TextBlock">
@@ -34,21 +40,21 @@
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource PanelBg}" />
+            <Setter Property="Background" Value="{StaticResource OledControlBg}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource OledBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Padding" Value="10,6" />
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}" />
+            <Setter Property="CaretBrush" Value="{StaticResource AccentGreen}" />
         </Style>
 
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource PanelBg}" />
+            <Setter Property="Background" Value="{StaticResource OledControlBg}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource OledBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Padding" Value="8,5" />
             <Setter Property="FontSize" Value="13" />
         </Style>
 
@@ -59,25 +65,27 @@
         </Style>
 
         <Style TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource ControlBg}" />
+            <Setter Property="Background" Value="{StaticResource OledControlBg}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource OledBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="14,7" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
 
-        <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="{StaticResource AccentBlue}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+        <Style x:Key="AccentSaveButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#FF5E1A" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="18,8" />
         </Style>
 
-        <!-- TabControl and TabItem Styles -->
+        <!-- Modern Motorsport Tab Styling -->
         <Style TargetType="TabControl">
-            <Setter Property="Background" Value="{StaticResource DarkBg}" />
+            <Setter Property="Background" Value="{StaticResource OledBaseBg}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
         </Style>
@@ -87,10 +95,10 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="TabBorder"
-                                Background="{StaticResource PanelBg}"
-                                BorderBrush="{StaticResource BorderBrushColor}"
-                                BorderThickness="0,0,1,1"
-                                Padding="16,10"
+                                Background="#0A0A0E"
+                                BorderBrush="{StaticResource OledBorder}"
+                                BorderThickness="0,0,1,2"
+                                Padding="18,12"
                                 Cursor="Hand">
                             <ContentPresenter ContentSource="Header"
                                               HorizontalAlignment="Center"
@@ -98,11 +106,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource DarkBg}" />
-                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,2,0,0" />
-                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentBlue}" />
-                                <Setter Property="Foreground" Value="White" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter TargetName="TabBorder" Property="Background" Value="#121218" />
+                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,0,1,2" />
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="FontWeight" Value="Bold" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="False">
                                 <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
@@ -113,18 +121,19 @@
             </Setter>
         </Style>
 
-        <!-- Preset Templates -->
+        <!-- Preset Header & Detail Templates -->
         <DataTemplate x:Key="PresetHeaderTemplate" DataType="{x:Type vm:PresetConfigurationItemViewModel}">
-            <TextBlock Text="{Binding Header}" FontSize="12" />
+            <TextBlock Text="{Binding Header}" FontSize="12" FontWeight="SemiBold" />
         </DataTemplate>
 
         <DataTemplate x:Key="PresetDetailTemplate" DataType="{x:Type vm:PresetConfigurationItemViewModel}">
-            <StackPanel Margin="0,12,0,4">
+            <StackPanel Margin="0,14,0,4">
                 <RadioButton Content="Active / Default Preset"
                              IsChecked="{Binding IsActive, Mode=TwoWay}"
                              GroupName="{Binding GroupName}"
-                             FontWeight="SemiBold"
-                             Margin="0,0,0,12" />
+                             FontWeight="Bold"
+                             Foreground="{StaticResource AccentGreen}"
+                             Margin="0,0,0,14" />
 
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
@@ -151,7 +160,7 @@
                     <Button Grid.Column="2"
                             Content="🖥️ Windows Display Settings"
                             Command="{Binding OpenDisplaySettingsCommand}"
-                            Padding="8,4"
+                            Padding="10,5"
                             FontSize="12" />
                 </Grid>
 
@@ -181,7 +190,7 @@
                               DisplayMemberPath="DisplayName" />
                 </Grid>
 
-                <Grid Margin="0,0,0,10">
+                <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
@@ -196,12 +205,12 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Applications &amp; Tools:" VerticalAlignment="Top" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Auto-Launch Hooks:" VerticalAlignment="Top" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" />
                     <StackPanel Grid.Column="1">
                         <ItemsControl ItemsSource="{Binding ApplicationHooks}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:ApplicationHookItemViewModel}">
-                                    <Border Background="{StaticResource DarkBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,6">
+                                    <Border Background="{StaticResource OledControlBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -209,17 +218,17 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" />
                                                 <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
-                                            <CheckBox Grid.Column="1" Content="Close when switching away" IsChecked="{Binding CloseOnSwitchAway, Mode=TwoWay}" VerticalAlignment="Center" Margin="12,0,8,0" FontSize="11" />
-                                            <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}" Padding="6,2" FontSize="11" VerticalAlignment="Center" ToolTip="Remove application hook" />
+                                            <CheckBox Grid.Column="1" Content="Close on switch away" IsChecked="{Binding CloseOnSwitchAway, Mode=TwoWay}" VerticalAlignment="Center" Margin="14,0,10,0" FontSize="11" />
+                                            <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}" Padding="8,3" FontSize="11" VerticalAlignment="Center" ToolTip="Remove application hook" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Content="+ Add Application (.exe)" Command="{Binding AddApplicationHookCommand}" HorizontalAlignment="Left" Padding="10,5" FontSize="12" Margin="0,2,0,0" />
+                        <Button Content="+ Add Application (.exe)" Command="{Binding AddApplicationHookCommand}" HorizontalAlignment="Left" Padding="12,6" FontSize="12" Margin="0,2,0,0" />
                     </StackPanel>
                 </Grid>
             </StackPanel>
@@ -233,59 +242,68 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header Bar -->
-        <Border Grid.Row="0" Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="0,0,0,1" Padding="16,12">
+        <!-- Cockpit Header Bar -->
+        <Border Grid.Row="0" Background="#0A0A0E" BorderBrush="{StaticResource OledBorder}" BorderThickness="0,0,0,1" Padding="20,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="⚡ RigSwitch" FontSize="18" FontWeight="Bold" Margin="0,0,12,0" />
-                    <Border Background="{StaticResource ControlBg}" CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding CurrentProfileBadgeText}" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="⚡ RIGSWITCH" FontSize="18" FontWeight="ExtraBold" FontFamily="Segoe UI Variable Display, Bahnschrift" Margin="0,0,14,0" Foreground="#FFFFFF" />
+                    <Border Background="#14141C" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="12" Padding="12,4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CurrentProfileBadgeText}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" />
                     </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="🖥️ Switch to Desk" Command="{Binding SwitchToDeskCommand}" Margin="0,0,8,0" />
-                    <Button Content="🏎️ Switch to Sim Rig" Command="{Binding SwitchToRigCommand}" />
+                    <Button Content="🖥️ Desk Setup" Command="{Binding SwitchToDeskCommand}" Margin="0,0,10,0" BorderBrush="{StaticResource AccentGreen}" />
+                    <Button Content="🏎️ Sim Rig" Command="{Binding SwitchToRigCommand}" BorderBrush="{StaticResource AccentOrange}" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Main Tab Content -->
-        <TabControl Grid.Row="1" Background="{StaticResource DarkBg}">
+        <TabControl Grid.Row="1" Background="{StaticResource OledBaseBg}">
             <!-- Tab 1: Workstation Profiles -->
-            <TabItem Header="Workstation Profiles">
+            <TabItem Header="⚙️ Workstation Profiles">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20">
                     <StackPanel>
-                        <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                        <!-- Desk Presets Card -->
+                        <Border Background="{StaticResource OledCardBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="🖥️ Desk Presets" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <TextBlock Text="🖥️ DESK PRESETS" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource AccentGreen}" />
+                                    <TextBlock Text=" — Productivity &amp; Media" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" />
+                                </StackPanel>
                                 <TabControl ItemsSource="{Binding DeskPresets}"
                                             ItemTemplate="{StaticResource PresetHeaderTemplate}"
                                             ContentTemplate="{StaticResource PresetDetailTemplate}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                        <!-- Sim Rig Presets Card -->
+                        <Border Background="{StaticResource OledCardBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="🏎️ Sim Rig Presets" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <TextBlock Text="🏎️ SIM RIG PRESETS" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource AccentOrange}" />
+                                    <TextBlock Text=" — GT3, Rally &amp; Flight Cockpit" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" />
+                                </StackPanel>
                                 <TabControl ItemsSource="{Binding RigPresets}"
                                             ItemTemplate="{StaticResource PresetHeaderTemplate}"
                                             ContentTemplate="{StaticResource PresetDetailTemplate}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16">
+                        <!-- Hardware Telemetry Summary -->
+                        <Border Background="{StaticResource OledCardBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="8" Padding="18">
                             <StackPanel>
-                                <Grid Margin="0,0,0,8">
+                                <Grid Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="🔍 Detected Hardware Summary" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Content="↻ Refresh Devices" Command="{Binding RefreshDevicesCommand}" Padding="8,4" FontSize="12" />
+                                    <TextBlock Text="HARDWARE TELEMETRY" FontSize="13" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="↻ Refresh Hardware" Command="{Binding RefreshDevicesCommand}" Padding="10,4" FontSize="12" />
                                 </Grid>
                                 <TextBlock Text="Active Displays:" FontWeight="SemiBold" Margin="0,4,0,4" Foreground="{StaticResource TextMuted}" />
                                 <ItemsControl ItemsSource="{Binding DetectedDisplays}">
@@ -310,14 +328,14 @@
             </TabItem>
 
             <!-- Tab 2: Device Nicknames -->
-            <TabItem Header="Device Nicknames">
+            <TabItem Header="🏷️ Device Nicknames">
                 <Grid Margin="20">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
-                               Text="Map detected monitors and audio playback devices to custom friendly names. These nicknames override raw hardware labels across RigSwitch."
+                               Text="Map detected monitors and audio playback devices to clean friendly names. These nicknames override cryptic Windows hardware identifiers."
                                Foreground="{StaticResource TextMuted}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,16" />
@@ -326,11 +344,11 @@
                         <ItemsControl ItemsSource="{Binding DeviceNicknames}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource PanelBg}"
-                                            BorderBrush="{StaticResource BorderBrushColor}"
+                                    <Border Background="{StaticResource OledCardBg}"
+                                            BorderBrush="{StaticResource OledBorder}"
                                             BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="12"
+                                            CornerRadius="6"
+                                            Padding="14"
                                             Margin="0,0,0,8">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -339,12 +357,12 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <Border Background="{StaticResource ControlBg}" CornerRadius="3" Padding="4,1" Margin="0,0,6,0">
-                                                        <TextBlock Text="{Binding DeviceType}" FontSize="11" Foreground="{StaticResource AccentBlue}" />
+                                                    <Border Background="{StaticResource OledControlBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                                        <TextBlock Text="{Binding DeviceType}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" />
                                                     </Border>
-                                                    <TextBlock Text="{Binding HardwareName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding HardwareName}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding DeviceId}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DeviceId}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
                                             <TextBox Grid.Column="1"
                                                      Text="{Binding CustomNickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -360,14 +378,14 @@
             </TabItem>
 
             <!-- Tab 3: Audio Device Visibility -->
-            <TabItem Header="Audio Device Visibility">
+            <TabItem Header="🎧 Audio Cleanup">
                 <Grid Margin="20">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
-                               Text="Check or uncheck endpoints to control their visibility in Windows. Unchecked devices (e.g. SteelSeries Sonar, Oculus, Steam Streaming) are disabled and hidden in real-time."
+                               Text="Clean up Windows audio menus by toggling virtual playback endpoints. Unchecked devices (e.g. SteelSeries Sonar virtual channels, Oculus Virtual Audio, Steam Streaming) are disabled in real-time."
                                Foreground="{StaticResource TextMuted}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,16" />
@@ -376,11 +394,11 @@
                         <ItemsControl ItemsSource="{Binding AudioEndpointsVisibility}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource PanelBg}"
-                                            BorderBrush="{StaticResource BorderBrushColor}"
+                                    <Border Background="{StaticResource OledCardBg}"
+                                            BorderBrush="{StaticResource OledBorder}"
                                             BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="12"
+                                            CornerRadius="6"
+                                            Padding="14"
                                             Margin="0,0,0,8">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -390,9 +408,9 @@
                                             <CheckBox Grid.Column="0"
                                                       IsChecked="{Binding IsVisible, Mode=TwoWay}"
                                                       VerticalAlignment="Center"
-                                                      Margin="0,0,12,0" />
+                                                      Margin="0,0,14,0" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" />
                                                 <TextBlock Text="{Binding Adapter}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" />
                                                 <TextBlock Text="{Binding Id}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0" />
                                             </StackPanel>
@@ -406,13 +424,13 @@
             </TabItem>
 
             <!-- Tab 4: Hotkeys & System -->
-            <TabItem Header="Hotkeys &amp; System">
+            <TabItem Header="⌨️ Global Hotkeys">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
                     <StackPanel>
-                        <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                        <Border Background="{StaticResource OledCardBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="⌨️ Global Hotkeys" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                <Grid Margin="0,0,0,10">
+                                <TextBlock Text="GLOBAL HOTKEYS" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource AccentOrange}" Margin="0,0,0,14" />
+                                <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="220" />
                                         <ColumnDefinition Width="*" />
@@ -420,7 +438,7 @@
                                     <TextBlock Text="Toggle Desk / Sim Rig:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
                                     <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding ToggleHotkey, Mode=TwoWay}" />
                                 </Grid>
-                                <Grid Margin="0,0,0,10">
+                                <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="220" />
                                         <ColumnDefinition Width="*" />
@@ -439,12 +457,12 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="1" CornerRadius="6" Padding="16">
+                        <Border Background="{StaticResource OledCardBg}" BorderBrush="{StaticResource OledBorder}" BorderThickness="1" CornerRadius="8" Padding="18">
                             <StackPanel>
-                                <TextBlock Text="⚙️ Application Preferences" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                <TextBlock Text="APPLICATION PREFERENCES" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource TextMuted}" Margin="0,0,0,14" />
                                 <CheckBox Content="Start RigSwitch minimized to Windows system tray"
                                           IsChecked="{Binding StartMinimizedToTray, Mode=TwoWay}"
-                                          Margin="0,0,0,10" />
+                                          Margin="0,0,0,12" />
                                 <CheckBox Content="Display balloon notifications when workstation profile switches"
                                           IsChecked="{Binding ShowToastNotifications, Mode=TwoWay}" />
                             </StackPanel>
@@ -455,14 +473,14 @@
         </TabControl>
 
         <!-- Bottom Action Bar & Status -->
-        <Border Grid.Row="2" Background="{StaticResource PanelBg}" BorderBrush="{StaticResource BorderBrushColor}" BorderThickness="0,1,0,0" Padding="16,10">
+        <Border Grid.Row="2" Background="#0A0A0E" BorderBrush="{StaticResource OledBorder}" BorderThickness="0,1,0,0" Padding="20,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="1" Content="💾 Save Settings" Command="{Binding SaveSettingsCommand}" Style="{StaticResource AccentButtonStyle}" />
+                <Button Grid.Column="1" Content="💾 Save Settings" Command="{Binding SaveSettingsCommand}" Style="{StaticResource AccentSaveButtonStyle}" />
             </Grid>
         </Border>
     </Grid>
