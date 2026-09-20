@@ -246,6 +246,16 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 AvailableDisplayOptions.Add(new DeviceSelectionOption(d.MonitorId, label));
             }
 
+            AvailableAudioOptions.Clear();
+            AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
+            foreach (var a in audioEndpoints)
+            {
+                string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
+                var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+                var stateTag = a.State == RigSwitch.Core.Enums.DevicePresenceState.Active ? "" : $" [{a.State}]";
+                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, $"{name}{stateTag}"));
+            }
+
             DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions);
             DeviceOptionResolver.EnsureDisplayOption(RigMonitorId, AvailableDisplayOptions);
 
