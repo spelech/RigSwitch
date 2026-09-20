@@ -20,9 +20,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate-docs:
+    name: "Docs: Lint, Typecheck & VitePress Build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint & Typecheck
+        run: |
+          npm run lint
+          npx tsc --noEmit
+
+      - name: Build VitePress Site
+        run: npm run docs:build
+
   gate-1-format:
     name: "Gate 1: Code Formatting & Static Analysis"
     runs-on: windows-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -90,7 +115,7 @@ jobs:
   gate-4-smoke-stage:
     name: "Gate 4: Smoke Verification & Artifact Staging"
     runs-on: windows-latest
-    needs: gate-3-test
+    needs: [gate-3-test, gate-docs]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
