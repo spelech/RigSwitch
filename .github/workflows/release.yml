@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress
+
+      - name: Extract Tag Version
+        id: get_version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Releasing version: $version"
+
+      - name: Run Full Test Suite
+        run: |
+          dotnet test RigSwitch.slnx -c Release
+
+      - name: Publish Self-Contained Binary
+        run: |
+          dotnet publish src/RigSwitch.App/RigSwitch.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:Version=${{ steps.get_version.outputs.version }} `
+            -o publish/
+
+      - name: Compile Inno Setup Installer
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = (Get-Command iscc.exe).Source
+          }
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          & $iscc "/DMyAppVersion=$version" packaging/installer.iss
+
+      - name: Compute Checksums & Generate Winget Manifests
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          $installer = "dist/RigSwitch-Setup-v$version.exe"
+          $hash = (Get-FileHash -Path $installer -Algorithm SHA256).Hash
+          "$hash  $(Split-Path $installer -Leaf)" | Set-Content -Path "$installer.sha256" -Encoding utf8
+
+          # Generate winget manifests
+          $manifestDir = "dist/winget/manifests/s/spelech/RigSwitch/$version"
+          ./scripts/generate-winget-manifests.ps1 -Version $version -InstallerSha256 $hash -OutputDirectory $manifestDir
+
+          # Zip manifests for easy download
+          Compress-Archive -Path "dist/winget/*" -DestinationPath "dist/winget-manifests-v$version.zip" -Force
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/RigSwitch-Setup-v${{ steps.get_version.outputs.version }}.exe
+            dist/RigSwitch-Setup-v${{ steps.get_version.outputs.version }}.exe.sha256
+            dist/winget-manifests-v${{ steps.get_version.outputs.version }}.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
