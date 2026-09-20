@@ -6,4 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RigSwitch.Core\RigSwitch.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RigSwitch.Tests.Unit" />
+  </ItemGroup>
 </Project>

@@ -13,6 +13,7 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
 {
     private readonly IMMDeviceEnumerator? _deviceEnumerator;
     private readonly IPolicyConfig? _policyConfig;
+    private readonly Action<string, bool>? _registryFallbackAction;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowsNativeAudioProvider"/> class using live Windows COM activations.
@@ -22,114 +23,131 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="WindowsNativeAudioProvider"/> class with explicit COM interfaces for testing.
+    /// Initializes a new instance of the <see cref="WindowsNativeAudioProvider"/> class with explicit dependencies for testing.
     /// </summary>
     /// <param name="deviceEnumerator">Optional <see cref="IMMDeviceEnumerator"/> mock or instance.</param>
     /// <param name="policyConfig">Optional <see cref="IPolicyConfig"/> mock or instance.</param>
-    internal WindowsNativeAudioProvider(IMMDeviceEnumerator? deviceEnumerator, IPolicyConfig? policyConfig)
+    /// <param name="registryFallbackAction">Optional delegate to intercept registry fallback in tests.</param>
+    internal WindowsNativeAudioProvider(
+        IMMDeviceEnumerator? deviceEnumerator,
+        IPolicyConfig? policyConfig,
+        Action<string, bool>? registryFallbackAction = null)
     {
         _deviceEnumerator = deviceEnumerator;
         _policyConfig = policyConfig;
+        _registryFallbackAction = registryFallbackAction;
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<AudioEndpointInfo> EnumerateRenderEndpoints()
     {
+        bool ownsEnumerator = _deviceEnumerator == null;
         var enumerator = _deviceEnumerator ?? CreateDeviceEnumerator();
-        string? defaultPlaybackId = GetDefaultEndpointId(enumerator, ERole.eMultimedia);
-        string? defaultCommunicationsId = GetDefaultEndpointId(enumerator, ERole.eCommunications);
 
-        const DevicePresenceState allStates =
-            DevicePresenceState.Active |
-            DevicePresenceState.Disabled |
-            DevicePresenceState.NotPresent |
-            DevicePresenceState.Unplugged;
-
-        int hr = enumerator.EnumAudioEndpoints(EDataFlow.eRender, allStates, out var collection);
-        if (hr < 0 || collection == null)
-        {
-            Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
-            return [];
-        }
-
-        var endpoints = new List<AudioEndpointInfo>();
         try
         {
-            hr = collection.GetCount(out uint count);
-            if (hr < 0)
+            string? defaultPlaybackId = GetDefaultEndpointId(enumerator, ERole.eMultimedia);
+            string? defaultCommunicationsId = GetDefaultEndpointId(enumerator, ERole.eCommunications);
+
+            const DevicePresenceState allStates =
+                DevicePresenceState.Active |
+                DevicePresenceState.Disabled |
+                DevicePresenceState.NotPresent |
+                DevicePresenceState.Unplugged;
+
+            int hr = enumerator.EnumAudioEndpoints(EDataFlow.eRender, allStates, out var collection);
+            if (hr < 0 || collection == null)
             {
-                Marshal.ThrowExceptionForHR(hr);
+                Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
+                return [];
             }
 
-            for (uint i = 0; i < count; i++)
+            var endpoints = new List<AudioEndpointInfo>();
+            try
             {
-                hr = collection.Item(i, out var device);
-                if (hr != 0 || device == null)
+                hr = collection.GetCount(out uint count);
+                if (hr < 0)
                 {
-                    continue;
+                    Marshal.ThrowExceptionForHR(hr);
                 }
 
-                try
+                for (uint i = 0; i < count; i++)
                 {
-                    if (device.GetId(out var id) != 0 || string.IsNullOrWhiteSpace(id))
+                    hr = collection.Item(i, out var device);
+                    if (hr != 0 || device == null)
                     {
                         continue;
                     }
 
-                    device.GetState(out var state);
-
-                    string friendlyName = string.Empty;
-                    string adapterDescription = string.Empty;
-
-                    if (device.OpenPropertyStore(StorageAccessMode.Read, out var store) == 0 && store != null)
+                    try
                     {
-                        try
+                        if (device.GetId(out var id) != 0 || string.IsNullOrWhiteSpace(id))
                         {
-                            friendlyName = ReadStringProperty(store, PropertyKeys.PKEY_Device_FriendlyName);
-                            if (string.IsNullOrWhiteSpace(friendlyName))
+                            continue;
+                        }
+
+                        device.GetState(out var state);
+
+                        string friendlyName = string.Empty;
+                        string adapterDescription = string.Empty;
+
+                        if (device.OpenPropertyStore(StorageAccessMode.Read, out var store) == 0 && store != null)
+                        {
+                            try
                             {
-                                friendlyName = ReadStringProperty(store, PropertyKeys.PKEY_DeviceInterface_FriendlyName);
+                                friendlyName = ReadStringProperty(store, PropertyKeys.PKEY_Device_FriendlyName);
+                                if (string.IsNullOrWhiteSpace(friendlyName))
+                                {
+                                    friendlyName = ReadStringProperty(store, PropertyKeys.PKEY_DeviceInterface_FriendlyName);
+                                }
+
+                                adapterDescription = ReadStringProperty(store, PropertyKeys.PKEY_Device_DeviceDesc);
                             }
-
-                            adapterDescription = ReadStringProperty(store, PropertyKeys.PKEY_Device_DeviceDesc);
+                            finally
+                            {
+                                SafeReleaseComObject(store);
+                            }
                         }
-                        finally
+
+                        if (string.IsNullOrWhiteSpace(friendlyName))
                         {
-                            Marshal.ReleaseComObject(store);
+                            friendlyName = id;
                         }
-                    }
 
-                    if (string.IsNullOrWhiteSpace(friendlyName))
+                        bool isDefaultPlayback = !string.IsNullOrEmpty(defaultPlaybackId) &&
+                            string.Equals(id, defaultPlaybackId, StringComparison.OrdinalIgnoreCase);
+
+                        bool isDefaultCommunications = !string.IsNullOrEmpty(defaultCommunicationsId) &&
+                            string.Equals(id, defaultCommunicationsId, StringComparison.OrdinalIgnoreCase);
+
+                        endpoints.Add(new AudioEndpointInfo(
+                            id: id,
+                            name: friendlyName,
+                            adapterDescription: adapterDescription,
+                            state: state,
+                            isDefaultPlayback: isDefaultPlayback,
+                            isDefaultCommunications: isDefaultCommunications));
+                    }
+                    finally
                     {
-                        friendlyName = id;
+                        SafeReleaseComObject(device);
                     }
-
-                    bool isDefaultPlayback = !string.IsNullOrEmpty(defaultPlaybackId) &&
-                        string.Equals(id, defaultPlaybackId, StringComparison.OrdinalIgnoreCase);
-
-                    bool isDefaultCommunications = !string.IsNullOrEmpty(defaultCommunicationsId) &&
-                        string.Equals(id, defaultCommunicationsId, StringComparison.OrdinalIgnoreCase);
-
-                    endpoints.Add(new AudioEndpointInfo(
-                        id: id,
-                        name: friendlyName,
-                        adapterDescription: adapterDescription,
-                        state: state,
-                        isDefaultPlayback: isDefaultPlayback,
-                        isDefaultCommunications: isDefaultCommunications));
-                }
-                finally
-                {
-                    Marshal.ReleaseComObject(device);
                 }
             }
+            finally
+            {
+                SafeReleaseComObject(collection);
+            }
+
+            return endpoints.AsReadOnly();
         }
         finally
         {
-            Marshal.ReleaseComObject(collection);
+            if (ownsEnumerator)
+            {
+                SafeReleaseComObject(enumerator);
+            }
         }
-
-        return endpoints.AsReadOnly();
     }
 
     /// <inheritdoc/>
@@ -137,11 +155,23 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointId);
 
+        bool ownsPolicyConfig = _policyConfig == null;
         var policyConfig = _policyConfig ?? CreatePolicyConfig();
-        int hr = policyConfig.SetDefaultEndpoint(endpointId, role);
-        if (hr != 0)
+
+        try
         {
-            Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
+            int hr = policyConfig.SetDefaultEndpoint(endpointId, role);
+            if (hr != 0)
+            {
+                Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
+            }
+        }
+        finally
+        {
+            if (ownsPolicyConfig)
+            {
+                SafeReleaseComObject(policyConfig);
+            }
         }
     }
 
@@ -150,10 +180,13 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointId);
 
+        bool ownsPolicyConfig = _policyConfig == null;
+        IPolicyConfig? policyConfig = null;
         bool comSucceeded = false;
+
         try
         {
-            var policyConfig = _policyConfig ?? CreatePolicyConfig();
+            policyConfig = _policyConfig ?? CreatePolicyConfig();
             int hr = policyConfig.SetEndpointVisibility(endpointId, isVisible);
             if (hr == 0)
             {
@@ -164,10 +197,57 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
         {
             // COM call failed; attempt registry fallback
         }
+        finally
+        {
+            if (ownsPolicyConfig)
+            {
+                SafeReleaseComObject(policyConfig);
+            }
+        }
 
         if (!comSucceeded)
         {
-            ApplyRegistryVisibilityFallback(endpointId, isVisible);
+            if (_registryFallbackAction != null)
+            {
+                _registryFallbackAction(endpointId, isVisible);
+            }
+            else
+            {
+                ApplyRegistryVisibilityFallback(endpointId, isVisible);
+            }
+        }
+    }
+
+    internal static string ExtractEndpointGuid(string endpointId)
+    {
+        var match = EndpointGuidRegex().Match(endpointId);
+        if (!match.Success)
+        {
+            return endpointId.StartsWith('{') && endpointId.EndsWith('}') ? endpointId : $"{{{endpointId}}}";
+        }
+
+        string val = match.Value;
+        return val.StartsWith('{') && val.EndsWith('}') ? val : $"{{{val}}}";
+    }
+
+    internal static void ApplyRegistryVisibilityFallback(string endpointId, bool isVisible)
+    {
+        string guidPart = ExtractEndpointGuid(endpointId);
+        string subKey = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{guidPart}";
+
+        using var key = Registry.LocalMachine.OpenSubKey(subKey, writable: true)
+            ?? throw new InvalidOperationException($"Registry key '{subKey}' could not be opened for writing.");
+
+        // DeviceState: 1 = Active, 2 = Disabled
+        int newState = isVisible ? 1 : 2;
+        key.SetValue("DeviceState", newState, RegistryValueKind.DWord);
+    }
+
+    private static void SafeReleaseComObject(object? obj)
+    {
+        if (obj != null && Marshal.IsComObject(obj))
+        {
+            Marshal.ReleaseComObject(obj);
         }
     }
 
@@ -205,7 +285,7 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
                 }
                 finally
                 {
-                    Marshal.ReleaseComObject(endpoint);
+                    SafeReleaseComObject(endpoint);
                 }
             }
         }
@@ -238,25 +318,6 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
         return string.Empty;
     }
 
-    private static void ApplyRegistryVisibilityFallback(string endpointId, bool isVisible)
-    {
-        string guidPart = ExtractEndpointGuid(endpointId);
-        string subKey = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{guidPart}";
-
-        using var key = Registry.LocalMachine.OpenSubKey(subKey, writable: true)
-            ?? throw new InvalidOperationException($"Registry key '{subKey}' could not be opened for writing.");
-
-        // DeviceState: 1 = Active, 2 = Disabled
-        int newState = isVisible ? 1 : 2;
-        key.SetValue("DeviceState", newState, RegistryValueKind.DWord);
-    }
-
-    private static string ExtractEndpointGuid(string endpointId)
-    {
-        var match = EndpointGuidRegex().Match(endpointId);
-        return match.Success ? match.Value : endpointId;
-    }
-
-    [GeneratedRegex(@"\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}", RegexOptions.RightToLeft)]
+    [GeneratedRegex(@"(?:\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", RegexOptions.RightToLeft)]
     private static partial Regex EndpointGuidRegex();
 }

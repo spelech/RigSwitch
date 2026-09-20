@@ -73,9 +73,9 @@ public static class PropertyKeys
 }
 
 /// <summary>
-/// Minimal PROPVARIANT structure representation for property value extraction.
+/// Minimal PROPVARIANT structure representation for property value extraction (24 bytes on x64).
 /// </summary>
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Explicit, Size = 24)]
 public struct PROPVARIANT
 {
     [FieldOffset(0)]
