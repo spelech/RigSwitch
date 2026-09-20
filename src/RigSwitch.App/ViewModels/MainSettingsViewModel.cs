@@ -45,6 +45,70 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<DeviceSelectionOption> AvailableAudioOptions { get; } = [];
     public ObservableCollection<DeviceNicknameItemViewModel> DeviceNicknames { get; } = [];
     public ObservableCollection<AudioEndpointVisibilityItemViewModel> AudioEndpointsVisibility { get; } = [];
+    public System.ComponentModel.ICollectionView? FilteredAudioEndpoints { get; private set; }
+
+    private string _audioSearchText = string.Empty;
+    public string AudioSearchText
+    {
+        get => _audioSearchText;
+        set
+        {
+            if (SetProperty(ref _audioSearchText, value))
+            {
+                FilteredAudioEndpoints?.Refresh();
+            }
+        }
+    }
+
+    private string _audioFilterSelection = "All";
+    public string AudioFilterSelection
+    {
+        get => _audioFilterSelection;
+        set
+        {
+            if (SetProperty(ref _audioFilterSelection, value))
+            {
+                FilteredAudioEndpoints?.Refresh();
+                OnPropertyChanged(nameof(IsAllFilterSelected));
+                OnPropertyChanged(nameof(IsActiveFilterSelected));
+                OnPropertyChanged(nameof(IsInactiveFilterSelected));
+            }
+        }
+    }
+
+    public bool IsAllFilterSelected => string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase);
+    public bool IsActiveFilterSelected => string.Equals(AudioFilterSelection, "Active", StringComparison.OrdinalIgnoreCase);
+    public bool IsInactiveFilterSelected => string.Equals(AudioFilterSelection, "Inactive", StringComparison.OrdinalIgnoreCase);
+
+    public ICommand SelectAllAudioFilterCommand { get; }
+    public ICommand SelectActiveAudioFilterCommand { get; }
+    public ICommand SelectInactiveAudioFilterCommand { get; }
+
+    public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection)
+    {
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            bool nameMatch = item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            bool adapterMatch = item.Adapter.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            if (!nameMatch && !adapterMatch)
+            {
+                return false;
+            }
+        }
+
+        if (string.Equals(filterSelection, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            return item.State == RigSwitch.Core.Enums.DevicePresenceState.Active;
+        }
+
+        if (string.Equals(filterSelection, "Inactive", StringComparison.OrdinalIgnoreCase))
+        {
+            return item.State != RigSwitch.Core.Enums.DevicePresenceState.Active;
+        }
+
+        return true;
+    }
+
     public ObservableCollection<PresetConfigurationItemViewModel> DeskPresets { get; } = [];
     public ObservableCollection<PresetConfigurationItemViewModel> RigPresets { get; } = [];
 
@@ -116,6 +180,23 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         SwitchToRigCommand = new AsyncRelayCommand(() => SwitchProfileAsync(ProfileMode.SimRig), () => !IsBusy);
         SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync, () => !IsBusy);
         RefreshDevicesCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsBusy);
+
+        SelectAllAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "All");
+        SelectActiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Active");
+        SelectInactiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Inactive");
+
+        FilteredAudioEndpoints = System.Windows.Data.CollectionViewSource.GetDefaultView(AudioEndpointsVisibility);
+        if (FilteredAudioEndpoints != null)
+        {
+            FilteredAudioEndpoints.Filter = item =>
+            {
+                if (item is AudioEndpointVisibilityItemViewModel endpoint)
+                {
+                    return MatchesAudioFilter(endpoint, AudioSearchText, AudioFilterSelection);
+                }
+                return true;
+            };
+        }
     }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -149,7 +230,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
             DetectedAudioEndpoints.Clear();
-            foreach (var a in audioEndpoints)
+            foreach (var a in audioEndpoints.Where(x => x.State == RigSwitch.Core.Enums.DevicePresenceState.Active))
             {
                 DetectedAudioEndpoints.Add(a);
             }
@@ -163,6 +244,15 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     ? d.MonitorId
                     : $"{d.FriendlyName} [{d.MonitorId}]{stateTag}";
                 AvailableDisplayOptions.Add(new DeviceSelectionOption(d.MonitorId, label));
+            }
+
+            AvailableAudioOptions.Clear();
+            AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
+            foreach (var a in audioEndpoints.Where(x => x.State == RigSwitch.Core.Enums.DevicePresenceState.Active))
+            {
+                string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
+                var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
             }
 
             DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions);
@@ -228,7 +318,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     a.Name,
                     a.AdapterDescription,
                     isVisible,
-                    OnAudioVisibilityChangedAsync));
+                    OnAudioVisibilityChangedAsync,
+                    a.State));
             }
 
             StatusMessage = "Devices and configuration loaded.";

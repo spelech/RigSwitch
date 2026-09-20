@@ -52,6 +52,53 @@ public sealed class AudioEndpointVisibilityItemViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets the hardware presence or connection state of the audio endpoint.
+    /// </summary>
+    public RigSwitch.Core.Enums.DevicePresenceState State { get; }
+
+    /// <summary>
+    /// Gets a human-readable display string for the device presence state.
+    /// </summary>
+    public string StateLabel => State switch
+    {
+        RigSwitch.Core.Enums.DevicePresenceState.Active => "Active",
+        RigSwitch.Core.Enums.DevicePresenceState.Disabled => "Disabled",
+        RigSwitch.Core.Enums.DevicePresenceState.Unplugged => "Unplugged",
+        RigSwitch.Core.Enums.DevicePresenceState.NotPresent => "Not Present",
+        _ => State.ToString()
+    };
+
+    /// <summary>
+    /// Gets the badge background hex color string.
+    /// </summary>
+    public string StateBadgeBackground => State switch
+    {
+        RigSwitch.Core.Enums.DevicePresenceState.Active => "#0D2818",
+        RigSwitch.Core.Enums.DevicePresenceState.Disabled => "#332200",
+        _ => "#1A1A24"
+    };
+
+    /// <summary>
+    /// Gets the badge foreground hex color string.
+    /// </summary>
+    public string StateBadgeForeground => State switch
+    {
+        RigSwitch.Core.Enums.DevicePresenceState.Active => "#00E676",
+        RigSwitch.Core.Enums.DevicePresenceState.Disabled => "#FFB300",
+        _ => "#8E95A5"
+    };
+
+    /// <summary>
+    /// Gets the badge border hex color string.
+    /// </summary>
+    public string StateBadgeBorder => State switch
+    {
+        RigSwitch.Core.Enums.DevicePresenceState.Active => "#00C853",
+        RigSwitch.Core.Enums.DevicePresenceState.Disabled => "#FF9800",
+        _ => "#3A3A4E"
+    };
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="AudioEndpointVisibilityItemViewModel"/> class.
     /// </summary>
     /// <param name="id">The MMDevice endpoint GUID identifier.</param>
@@ -59,17 +106,20 @@ public sealed class AudioEndpointVisibilityItemViewModel : ViewModelBase
     /// <param name="adapter">The adapter description.</param>
     /// <param name="isVisible">Initial visibility state.</param>
     /// <param name="onVisibilityChanged">Callback invoked when visibility toggles.</param>
+    /// <param name="state">The device presence state (defaulting to Active).</param>
     public AudioEndpointVisibilityItemViewModel(
         string id,
         string name,
         string adapter,
         bool isVisible,
-        Func<AudioEndpointVisibilityItemViewModel, bool, Task>? onVisibilityChanged = null)
+        Func<AudioEndpointVisibilityItemViewModel, bool, Task>? onVisibilityChanged = null,
+        RigSwitch.Core.Enums.DevicePresenceState state = RigSwitch.Core.Enums.DevicePresenceState.Active)
     {
         Id = id;
         Name = name;
         Adapter = adapter;
         _isVisible = isVisible;
         _onVisibilityChanged = onVisibilityChanged;
+        State = state;
     }
 }

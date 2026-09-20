@@ -38,23 +38,182 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
+        <!-- High-Contrast Pure Pitch-Black TextBox Style with explicit ControlTemplate -->
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource OledControlBg}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="Background" Value="#0A0A0F" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="{StaticResource OledBorderBright}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="CaretBrush" Value="{StaticResource AccentGreen}" />
+            <Setter Property="SelectionBrush" Value="#00C853" />
+            <Setter Property="SelectionOpacity" Value="0.4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#555577" />
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentGreen}" />
+                                <Setter TargetName="border" Property="Background" Value="#000000" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.56" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
+        <!-- ComboBox ToggleButton Style -->
+        <Style x:Key="ComboBoxToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="ClickMode" Value="Press" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="templateRoot"
+                                Background="#0A0A0F"
+                                BorderBrush="{StaticResource OledBorderBright}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <Border x:Name="splitBorder"
+                                    Width="24"
+                                    HorizontalAlignment="Right"
+                                    Margin="0"
+                                    SnapsToDevicePixels="True">
+                                <Path x:Name="arrow"
+                                      Data="F1 M 0,0 L 2.667,2.667 L 5.333,0 Z"
+                                      Fill="#8E95A5"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="templateRoot" Property="BorderBrush" Value="#555577" />
+                                <Setter TargetName="arrow" Property="Fill" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="templateRoot" Property="BorderBrush" Value="{StaticResource AccentGreen}" />
+                                <Setter TargetName="arrow" Property="Fill" Value="{StaticResource AccentGreen}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="templateRoot" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- High-Contrast ComboBoxItem Style -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#0A0A0F" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A1A28" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0D2818" />
+                                <Setter Property="Foreground" Value="#00E676" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- High-Contrast ComboBox Style -->
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource OledControlBg}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="Background" Value="#0A0A0F" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="{StaticResource OledBorderBright}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Padding" Value="10,6" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
+                            <ToggleButton x:Name="toggleButton"
+                                          Style="{StaticResource ComboBoxToggleButtonStyle}"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                            <ContentPresenter x:Name="contentPresenter"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              IsHitTestVisible="False" />
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Slide">
+                                <Border x:Name="dropDownBorder"
+                                        Background="#0A0A0F"
+                                        BorderBrush="{StaticResource OledBorderBright}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        MinWidth="{Binding ActualWidth, ElementName=templateRoot}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer x:Name="dropDownScrollViewer">
+                                        <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="dropDownBorder" Property="Height" Value="95" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="templateRoot" Property="Opacity" Value="0.56" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="CheckBox">
@@ -381,19 +540,73 @@
                 <Grid Margin="20">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
                                Text="Clean up Windows audio menus by toggling virtual playback endpoints. Unchecked devices (e.g. SteelSeries Sonar virtual channels, Oculus Virtual Audio, Steam Streaming) are disabled in real-time."
                                Foreground="{StaticResource TextMuted}"
                                TextWrapping="Wrap"
-                               Margin="0,0,0,16" />
+                               Margin="0,0,0,14" />
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding AudioEndpointsVisibility}">
+                    <!-- Search and Filter Controls -->
+                    <Grid Grid.Row="1" Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Search Box with Clean Watermark -->
+                        <Grid Grid.Column="0" Margin="0,0,12,0">
+                            <TextBox x:Name="AudioSearchTextBox"
+                                     Text="{Binding AudioSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Padding="10,6"
+                                     ToolTip="Search audio devices by name or adapter" />
+                            <TextBlock Text="🔍 Search audio endpoints..."
+                                       Foreground="#55556E"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0"
+                                       IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=AudioSearchTextBox}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+
+                        <!-- Status Filter Buttons -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="All Devices"
+                                    Command="{Binding SelectAllAudioFilterCommand}"
+                                    Padding="12,5"
+                                    Margin="0,0,6,0"
+                                    FontSize="12" />
+                            <Button Content="Active Only"
+                                    Command="{Binding SelectActiveAudioFilterCommand}"
+                                    Padding="12,5"
+                                    Margin="0,0,6,0"
+                                    FontSize="12"
+                                    BorderBrush="{StaticResource AccentGreen}" />
+                            <Button Content="Disabled / Unplugged"
+                                    Command="{Binding SelectInactiveAudioFilterCommand}"
+                                    Padding="12,5"
+                                    FontSize="12"
+                                    BorderBrush="{StaticResource AccentOrange}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding FilteredAudioEndpoints}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#000000"
+                                    <Border Background="#050508"
                                             BorderBrush="{StaticResource OledBorderBright}"
                                             BorderThickness="1"
                                             CornerRadius="4"
@@ -403,16 +616,31 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <CheckBox Grid.Column="0"
                                                       IsChecked="{Binding IsVisible, Mode=TwoWay}"
                                                       VerticalAlignment="Center"
                                                       Margin="0,0,14,0" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" />
                                                 <TextBlock Text="{Binding Adapter}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" />
-                                                <TextBlock Text="{Binding Id}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0" />
+                                                <TextBlock Text="{Binding Id}" FontSize="10" Foreground="#55556E" Margin="0,1,0,0" />
                                             </StackPanel>
+                                            
+                                            <!-- Presence State Badge -->
+                                            <Border Grid.Column="2"
+                                                    Background="{Binding StateBadgeBackground}"
+                                                    BorderBrush="{Binding StateBadgeBorder}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    Padding="10,4"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding StateLabel}"
+                                                           FontSize="11"
+                                                           FontWeight="Bold"
+                                                           Foreground="{Binding StateBadgeForeground}" />
+                                            </Border>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
