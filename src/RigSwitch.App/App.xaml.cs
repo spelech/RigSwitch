@@ -121,9 +121,11 @@ public partial class App : Application
                 });
             };
 
-            bool startMinimized = settings.StartMinimizedToTray && !e.Args.Contains("--settings") && !e.Args.Contains("--show");
-            bool isFirstRunUnconfigured = string.IsNullOrWhiteSpace(settings.DeskMonitorId) && string.IsNullOrWhiteSpace(settings.RigMonitorId);
-            if (!startMinimized || isFirstRunUnconfigured)
+            var cmdArgs = Environment.GetCommandLineArgs();
+            bool isExplicitMinimized = cmdArgs.Any(a => a.Equals("--minimized", StringComparison.OrdinalIgnoreCase) || a.Equals("--tray", StringComparison.OrdinalIgnoreCase));
+            bool isExplicitShow = cmdArgs.Any(a => a.Equals("--settings", StringComparison.OrdinalIgnoreCase) || a.Equals("--show", StringComparison.OrdinalIgnoreCase));
+
+            if (!isExplicitMinimized || isExplicitShow)
             {
                 ShowSettingsWindow();
             }
@@ -147,13 +149,18 @@ public partial class App : Application
             return;
         }
 
-        _mainWindow.Show();
-        if (_mainWindow.WindowState == WindowState.Minimized)
+        Dispatcher.Invoke(() =>
         {
-            _mainWindow.WindowState = WindowState.Normal;
-        }
+            MainWindow = _mainWindow;
+            _mainWindow.Show();
+            if (_mainWindow.WindowState == WindowState.Minimized)
+            {
+                _mainWindow.WindowState = WindowState.Normal;
+            }
 
-        _mainWindow.Activate();
+            _mainWindow.Activate();
+            _mainWindow.Focus();
+        });
     }
 
     /// <inheritdoc/>
