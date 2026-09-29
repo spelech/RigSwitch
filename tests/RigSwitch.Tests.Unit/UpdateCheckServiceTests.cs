@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using NSubstitute;
+using RigSwitch.App.Services;
 using RigSwitch.App.ViewModels;
 using RigSwitch.App.Views;
 using RigSwitch.Core.Interfaces;
@@ -143,6 +144,64 @@ public class UpdateCheckServiceTests
         Assert.Equal("1.5.0", updatedTag);
         await storage.Received(1).SaveSettingsAsync(settings, Arg.Any<CancellationToken>());
         Assert.Contains("1.5.0", msg);
+    }
+
+    [Fact]
+    public async Task MainSettingsViewModel_CheckForUpdatesManualAsync_WhenUpToDate_UpdatesStatusMessage()
+    {
+        var mockCheckService = Substitute.For<IUpdateCheckService>();
+        mockCheckService.CheckForUpdatesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new UpdateInfo(false, "1.0.0", "1.0.0", "", "", ""));
+
+        var coordinator = Substitute.For<IProfileSwitchCoordinator>();
+        var settingsStorage = Substitute.For<ISettingsStorageService>();
+        settingsStorage.LoadSettingsAsync(Arg.Any<CancellationToken>())
+            .Returns(new UserSettings());
+
+        var trayService = new TrayIconService(coordinator, settingsStorage);
+
+        using var vm = new MainSettingsViewModel(
+            coordinator,
+            settingsStorage,
+            Substitute.For<IDisplayConfigurationService>(),
+            Substitute.For<IAudioEndpointDirector>(),
+            Substitute.For<IGlobalHotkeyService>(),
+            trayService,
+            mockCheckService);
+
+        await vm.CheckForUpdatesManualAsync();
+
+        Assert.Contains("latest version", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task MainSettingsViewModel_CheckForUpdatesAutoAsync_WhenCheckSkipped_DoesNotInvokeCheck()
+    {
+        var mockCheckService = Substitute.For<IUpdateCheckService>();
+        var settingsStorage = Substitute.For<ISettingsStorageService>();
+        var settings = new UserSettings
+        {
+            EnableAutoUpdateCheck = true,
+            UpdateCheckSkippedUntil = DateTime.UtcNow.AddHours(5)
+        };
+        settingsStorage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        var coordinator = Substitute.For<IProfileSwitchCoordinator>();
+        var trayService = new TrayIconService(coordinator, settingsStorage);
+
+        using var vm = new MainSettingsViewModel(
+            coordinator,
+            settingsStorage,
+            Substitute.For<IDisplayConfigurationService>(),
+            Substitute.For<IAudioEndpointDirector>(),
+            Substitute.For<IGlobalHotkeyService>(),
+            trayService,
+            mockCheckService);
+
+        await vm.LoadAsync();
+        await vm.CheckForUpdatesAutoAsync();
+
+        await mockCheckService.DidNotReceive().CheckForUpdatesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     private sealed class MockHttpMessageHandler : HttpMessageHandler
