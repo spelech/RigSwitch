@@ -280,11 +280,23 @@ public sealed class ReviewFixesTests
         });
     }
 
+    private static readonly object AppInitLock = new();
+
     private static void EnsureApplicationInitialized()
     {
-        if (System.Windows.Application.Current == null)
+        lock (AppInitLock)
         {
-            _ = new System.Windows.Application();
+            if (System.Windows.Application.Current == null)
+            {
+                try
+                {
+                    _ = new System.Windows.Application();
+                }
+                catch (InvalidOperationException)
+                {
+                    // Ignore if already created concurrently or in AppDomain
+                }
+            }
         }
     }
 

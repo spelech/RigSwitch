@@ -22,7 +22,14 @@ public sealed class UiScreenshotCaptureTests
         {
             if (System.Windows.Application.Current == null)
             {
-                _ = new System.Windows.Application();
+                try
+                {
+                    _ = new System.Windows.Application();
+                }
+                catch (InvalidOperationException)
+                {
+                    // Ignore if already initialized
+                }
             }
             var coordinator = Substitute.For<IProfileSwitchCoordinator>();
             var settingsService = Substitute.For<ISettingsStorageService>();
