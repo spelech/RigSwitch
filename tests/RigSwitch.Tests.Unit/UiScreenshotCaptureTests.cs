@@ -20,6 +20,10 @@ public sealed class UiScreenshotCaptureTests
     {
         RunInSta(() =>
         {
+            if (System.Windows.Application.Current == null)
+            {
+                _ = new System.Windows.Application();
+            }
             var coordinator = Substitute.For<IProfileSwitchCoordinator>();
             var settingsService = Substitute.For<ISettingsStorageService>();
             var displayService = Substitute.For<IDisplayConfigurationService>();

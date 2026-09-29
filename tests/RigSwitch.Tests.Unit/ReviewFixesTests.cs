@@ -261,10 +261,10 @@ public sealed class ReviewFixesTests
     {
         RunInSta(() =>
         {
+            EnsureApplicationInitialized();
             var coordinator = Substitute.For<IProfileSwitchCoordinator>();
             var trayIconService = new RigSwitch.App.Services.TrayIconService(coordinator, _settingsService);
             var vm = new RigSwitch.App.ViewModels.MainSettingsViewModel(
-
                 coordinator,
                 _settingsService,
                 _displayService,
@@ -278,6 +278,14 @@ public sealed class ReviewFixesTests
             window.SetExplicitShutdown();
             window.Close();
         });
+    }
+
+    private static void EnsureApplicationInitialized()
+    {
+        if (System.Windows.Application.Current == null)
+        {
+            _ = new System.Windows.Application();
+        }
     }
 
 
