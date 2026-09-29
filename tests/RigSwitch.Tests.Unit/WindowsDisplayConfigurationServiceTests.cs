@@ -105,6 +105,96 @@ public sealed class WindowsDisplayConfigurationServiceTests
     }
 
     [Fact]
+    public async Task ApplyDisplayTopologyAsync_MultiMonitor_ArrangesTargetsLinearlyAndDisablesInactive()
+    {
+        // Arrange - 3 displays: Path 0 is Desk (MSI4DD0), Path 1 is Rig Left (AUS3438), Path 2 is Rig Right (AUS3439)
+        var paths = new DISPLAYCONFIG_PATH_INFO[3];
+
+        paths[0].flags = NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE;
+        paths[0].targetInfo.id = 101;
+        paths[0].sourceInfo.modeInfoIdx = 0;
+
+        paths[1].flags = 0;
+        paths[1].targetInfo.id = 102;
+        paths[1].sourceInfo.modeInfoIdx = 1;
+
+        paths[2].flags = 0;
+        paths[2].targetInfo.id = 103;
+        paths[2].sourceInfo.modeInfoIdx = 2;
+
+        var modes = new DISPLAYCONFIG_MODE_INFO[3];
+        modes[0].infoType = DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
+        modes[0].modeInfo.sourceMode.width = 1920;
+        modes[1].infoType = DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
+        modes[1].modeInfo.sourceMode.width = 2560;
+        modes[2].infoType = DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
+        modes[2].modeInfo.sourceMode.width = 2560;
+
+        _ccdProvider.QueryDisplayConfig(
+            QueryDisplayFlags.QDC_ALL_PATHS,
+            out Arg.Any<DISPLAYCONFIG_PATH_INFO[]>(),
+            out Arg.Any<DISPLAYCONFIG_MODE_INFO[]>())
+            .Returns(x =>
+            {
+                x[1] = (DISPLAYCONFIG_PATH_INFO[])paths.Clone();
+                x[2] = (DISPLAYCONFIG_MODE_INFO[])modes.Clone();
+                return 0;
+            });
+
+        var dummyTarget = Arg.Any<DISPLAYCONFIG_TARGET_DEVICE_NAME>();
+        _ccdProvider.GetTargetDeviceName(ref dummyTarget).Returns(x =>
+        {
+            var target = (DISPLAYCONFIG_TARGET_DEVICE_NAME)x[0];
+            if (target.header.id == 101)
+            {
+                target.monitorFriendlyDeviceName = "Desk Display";
+                target.monitorDevicePath = @"\\?\DISPLAY#MSI4DD0#1";
+            }
+            else if (target.header.id == 102)
+            {
+                target.monitorFriendlyDeviceName = "Rig Left";
+                target.monitorDevicePath = @"\\?\DISPLAY#AUS3438#2";
+            }
+            else if (target.header.id == 103)
+            {
+                target.monitorFriendlyDeviceName = "Rig Right";
+                target.monitorDevicePath = @"\\?\DISPLAY#AUS3439#3";
+            }
+            x[0] = target;
+            return 0;
+        });
+
+        DISPLAYCONFIG_PATH_INFO[]? capturedPaths = null;
+        DISPLAYCONFIG_MODE_INFO[]? capturedModes = null;
+
+        _ccdProvider.SetDisplayConfig(
+            Arg.Do<DISPLAYCONFIG_PATH_INFO[]>(p => capturedPaths = (DISPLAYCONFIG_PATH_INFO[])p.Clone()),
+            Arg.Do<DISPLAYCONFIG_MODE_INFO[]>(m => capturedModes = (DISPLAYCONFIG_MODE_INFO[])m.Clone()),
+            Arg.Any<SetDisplayConfigFlags>())
+            .Returns(0);
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act
+        await service.ApplyDisplayTopologyAsync(["AUS3438", "AUS3439"], ["MSI4DD0"]);
+
+        // Assert
+        Assert.NotNull(capturedPaths);
+        Assert.NotNull(capturedModes);
+
+        // Path 0 (Desk) should be disabled
+        Assert.Equal(0u, capturedPaths[0].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE);
+
+        // Path 1 (Rig Left) and Path 2 (Rig Right) should be active
+        Assert.Equal(NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE, capturedPaths[1].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE);
+        Assert.Equal(NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE, capturedPaths[2].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE);
+
+        // Positions: Rig Left at (0,0), Rig Right at (2560,0)
+        Assert.Equal(0, capturedModes[1].modeInfo.sourceMode.position.x);
+        Assert.Equal(2560, capturedModes[2].modeInfo.sourceMode.position.x);
+    }
+
+    [Fact]
     public async Task ApplySingleDisplayTopologyAsync_EnablesTargetAndDisablesInactive()
     {
         // Arrange

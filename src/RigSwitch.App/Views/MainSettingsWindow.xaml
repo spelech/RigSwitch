@@ -241,6 +241,79 @@
             <Setter Property="Padding" Value="18,8" />
         </Style>
 
+        <!-- Monitor Tile Template for Drag-and-Drop / Pile Management -->
+        <DataTemplate x:Key="MonitorTileTemplate" DataType="{x:Type vm:DisplayMonitorTileViewModel}">
+            <Border Background="#050508"
+                    BorderBrush="{StaticResource OledBorderBright}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12"
+                    Margin="0,0,10,10"
+                    Width="160">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Tile Header Badge -->
+                    <Border Grid.Row="0"
+                            Background="#0A0A10"
+                            BorderBrush="{StaticResource AccentGreen}"
+                            BorderThickness="1.5"
+                            CornerRadius="6"
+                            Padding="8,4"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8">
+                        <TextBlock Text="{Binding DisplayNumber, StringFormat='Monitor {0}'}"
+                                   FontWeight="ExtraBold"
+                                   FontSize="16"
+                                   Foreground="{StaticResource AccentGreen}" />
+                    </Border>
+
+                    <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,8">
+                        <TextBlock Text="{Binding FriendlyName}"
+                                   FontWeight="Bold"
+                                   FontSize="12"
+                                   TextAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="140" />
+                        <TextBlock Text="{Binding MonitorId}"
+                                   FontSize="10"
+                                   Foreground="{StaticResource TextMuted}"
+                                   TextAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="140" />
+                    </StackPanel>
+
+                    <!-- Pile Action Buttons -->
+                    <UniformGrid Grid.Row="2" Columns="3">
+                        <Button Content="Off"
+                                Command="{Binding MoveToUnassignedCommand}"
+                                Padding="4,2"
+                                FontSize="10"
+                                Margin="1"
+                                ToolTip="Remove from Desk/Rig profiles" />
+                        <Button Content="Desk"
+                                Command="{Binding MoveToDeskCommand}"
+                                Padding="4,2"
+                                FontSize="10"
+                                Margin="1"
+                                BorderBrush="{StaticResource AccentGreen}"
+                                ToolTip="Assign to Desk Profile" />
+                        <Button Content="Rig"
+                                Command="{Binding MoveToRigCommand}"
+                                Padding="4,2"
+                                FontSize="10"
+                                Margin="1"
+                                BorderBrush="{StaticResource AccentOrange}"
+                                ToolTip="Assign to Sim Rig Profile" />
+                    </UniformGrid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
         <!-- Modern Motorsport Tab Styling -->
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="{StaticResource OledBaseBg}" />
@@ -426,6 +499,37 @@
             <TabItem Header="⚙️ Workstation Profiles">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20">
                     <StackPanel>
+                        <!-- Multi-Monitor Configuration & Identification Card -->
+                        <Border Background="#000000" BorderBrush="{StaticResource OledBorderBright}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18" Margin="0,0,0,16">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="🖥️ MULTI-MONITOR TOPOLOGY CONFIGURATION" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="Assign connected monitors by number to Desk or Sim Rig piles (supports single, dual, or 3-screen sim rigs)." FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="🔍 Identify Monitors"
+                                            Command="{Binding IdentifyMonitorsCommand}"
+                                            Padding="12,6"
+                                            BorderBrush="{StaticResource AccentGreen}"
+                                            VerticalAlignment="Center" />
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding MonitorTiles}"
+                                              ItemTemplate="{StaticResource MonitorTileTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Desk Presets Card: Pure Black with 3px Deep Emerald Left Accent Stripe -->
                         <Border Background="#000000" BorderBrush="{StaticResource AccentGreen}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18" Margin="0,0,0,16">
                             <StackPanel>

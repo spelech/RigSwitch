@@ -312,9 +312,9 @@ public sealed class SimulationDisturbanceContext
             }
         }
 
-        public async Task ApplySingleDisplayTopologyAsync(
-            string targetMonitorId,
-            string? inactiveMonitorId,
+        public async Task ApplyDisplayTopologyAsync(
+            IReadOnlyList<string> targetMonitorIds,
+            IReadOnlyList<string>? inactiveMonitorIds = null,
             CancellationToken cancellationToken = default)
         {
             TimeSpan delay;
@@ -335,7 +335,7 @@ public sealed class SimulationDisturbanceContext
             {
                 var exMsg = $"Simulated CCD failure with error code: 0x{errorCode:X8}";
                 _context.Log($"[Display] {exMsg}");
-                _context.RingBuffer.Record("ApplySingleDisplayTopology_Fail", input: targetMonitorId, errorMessage: exMsg, success: false);
+                _context.RingBuffer.Record("ApplyDisplayTopology_Fail", input: string.Join(",", targetMonitorIds), errorMessage: exMsg, success: false);
                 throw new InvalidOperationException(exMsg);
             }
 
@@ -344,19 +344,33 @@ public sealed class SimulationDisturbanceContext
                 for (var i = 0; i < _context._displays.Count; i++)
                 {
                     var d = _context._displays[i];
-                    if (string.Equals(d.MonitorId, targetMonitorId, StringComparison.OrdinalIgnoreCase))
+                    bool isTarget = targetMonitorIds.Any(t => string.Equals(d.MonitorId, t, StringComparison.OrdinalIgnoreCase));
+                    bool isInactive = inactiveMonitorIds != null && inactiveMonitorIds.Any(inact => string.Equals(d.MonitorId, inact, StringComparison.OrdinalIgnoreCase));
+
+                    if (isTarget)
                     {
-                        _context._displays[i] = new DisplayDeviceInfo(d.MonitorId, d.DevicePath, d.FriendlyName, d.DisplayAdapter, isActive: true, isPrimary: true);
+                        bool isPrimary = targetMonitorIds.Count > 0 && string.Equals(d.MonitorId, targetMonitorIds[0], StringComparison.OrdinalIgnoreCase);
+                        _context._displays[i] = new DisplayDeviceInfo(d.MonitorId, d.DevicePath, d.FriendlyName, d.DisplayAdapter, isActive: true, isPrimary: isPrimary);
                     }
-                    else if (inactiveMonitorId != null && string.Equals(d.MonitorId, inactiveMonitorId, StringComparison.OrdinalIgnoreCase))
+                    else if (isInactive || inactiveMonitorIds == null)
                     {
                         _context._displays[i] = new DisplayDeviceInfo(d.MonitorId, d.DevicePath, d.FriendlyName, d.DisplayAdapter, isActive: false, isPrimary: false);
                     }
                 }
 
-                _context.Log($"[Display] Topology applied: Target={targetMonitorId}, Inactive={inactiveMonitorId}");
-                _context.RingBuffer.Record("ApplySingleDisplayTopology", input: targetMonitorId, result: inactiveMonitorId, success: true);
+                _context.Log($"[Display] Topology applied: Targets={string.Join(",", targetMonitorIds)}, Inactives={string.Join(",", inactiveMonitorIds ?? Array.Empty<string>())}");
+                _context.RingBuffer.Record("ApplyDisplayTopology", input: string.Join(",", targetMonitorIds), success: true);
             }
+        }
+
+        public Task ApplySingleDisplayTopologyAsync(
+            string targetMonitorId,
+            string? inactiveMonitorId,
+            CancellationToken cancellationToken = default)
+        {
+            var targets = string.IsNullOrWhiteSpace(targetMonitorId) ? Array.Empty<string>() : new[] { targetMonitorId };
+            var inactives = string.IsNullOrWhiteSpace(inactiveMonitorId) ? null : new[] { inactiveMonitorId };
+            return ApplyDisplayTopologyAsync(targets, inactives, cancellationToken);
         }
     }
 

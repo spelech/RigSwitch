@@ -10,8 +10,8 @@
 
 **RigSwitch** is an ultra-low-latency Windows desktop control plane and system tray utility designed to execute atomic hardware transitions between two user-configured workstation profiles:
 
-1. **Desk Setup**: Primary workstation display active; secondary/simulator display disabled in Windows topology; default playback routed to primary desk audio with automatic fallback to secondary audio when unplugged or offline.
-2. **Sim Rig Setup**: Simulator or secondary display active; workstation display disabled in Windows topology; default playback routed to dedicated rig audio.
+1. **Desk Setup**: Primary workstation display(s) active; secondary/simulator displays disabled in Windows topology; default playback routed to primary desk audio with automatic fallback to secondary audio when unplugged or offline.
+2. **Sim Rig Setup**: Simulator display(s) (single, dual, or 3-screen triple rig) active; workstation displays disabled in Windows topology; default playback routed to dedicated rig audio.
 
 By directly leveraging Win32 Connecting and Configuring Displays (CCD) APIs and CoreAudio COM interfaces, RigSwitch eliminates the need for physical monitor power cycling, prevents phantom displays, and ensures games launch reliably on the intended screen.
 

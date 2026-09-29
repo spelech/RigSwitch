@@ -14,6 +14,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     private readonly Action<PresetConfigurationItemViewModel>? _onActivated;
     private string _name;
     private string _targetMonitorId;
+    private List<string> _targetMonitorIds = [];
     private string _primaryAudioId;
     private string _fallbackAudioId;
     private string _directHotkey;
@@ -60,7 +61,39 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     public string TargetMonitorId
     {
         get => _targetMonitorId;
-        set => SetProperty(ref _targetMonitorId, value);
+        set
+        {
+            if (SetProperty(ref _targetMonitorId, value))
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    if (_targetMonitorIds.Count > 0)
+                    {
+                        _targetMonitorIds[0] = value;
+                    }
+                    else
+                    {
+                        _targetMonitorIds.Add(value);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the list of target monitor hardware identifiers.
+    /// </summary>
+    public List<string> TargetMonitorIds
+    {
+        get => _targetMonitorIds;
+        set
+        {
+            _targetMonitorIds = value ?? [];
+            if (_targetMonitorIds.Count > 0)
+            {
+                TargetMonitorId = _targetMonitorIds[0];
+            }
+        }
     }
 
     /// <summary>
@@ -145,6 +178,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         _onActivated = onActivated;
 
         _name = preset.Name;
+        _targetMonitorIds = [.. preset.TargetMonitorIds];
         _targetMonitorId = preset.TargetMonitorId;
         _primaryAudioId = preset.PrimaryAudioId;
         _fallbackAudioId = preset.FallbackAudioId;
@@ -199,6 +233,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(target);
         target.Name = Name;
+        target.TargetMonitorIds = [.. TargetMonitorIds];
         target.TargetMonitorId = TargetMonitorId;
         target.PrimaryAudioId = PrimaryAudioId;
         target.FallbackAudioId = FallbackAudioId;

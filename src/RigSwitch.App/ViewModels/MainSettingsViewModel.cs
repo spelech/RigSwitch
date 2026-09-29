@@ -180,6 +180,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         SwitchToRigCommand = new AsyncRelayCommand(() => SwitchProfileAsync(ProfileMode.SimRig), () => !IsBusy);
         SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync, () => !IsBusy);
         RefreshDevicesCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsBusy);
+        IdentifyMonitorsCommand = new RelayCommand(IdentifyMonitors);
 
         SelectAllAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "All");
         SelectActiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Active");
@@ -321,6 +322,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     OnAudioVisibilityChangedAsync,
                     a.State));
             }
+
+            PopulateMonitorTiles(displays, _settings);
 
             StatusMessage = "Devices and configuration loaded.";
         }
