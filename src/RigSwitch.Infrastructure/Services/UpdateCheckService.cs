@@ -66,7 +66,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
                     ReleaseNotes: string.Empty,
                     DownloadUrl: string.Empty,
                     HtmlUrl: string.Empty,
-                    ErrorMessage: $"HTTP request failed with status code {response.StatusCode}.");
+                    ErrorMessage: $"HTTP request failed with status code {(int)response.StatusCode} ({response.StatusCode}).");
             }
 
             var jsonStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
