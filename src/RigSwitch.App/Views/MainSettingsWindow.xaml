@@ -798,7 +798,22 @@
                                           IsChecked="{Binding StartMinimizedToTray, Mode=TwoWay}"
                                           Margin="0,0,0,12" />
                                 <CheckBox Content="Display balloon notifications when workstation profile switches"
-                                          IsChecked="{Binding ShowToastNotifications, Mode=TwoWay}" />
+                                          IsChecked="{Binding ShowToastNotifications, Mode=TwoWay}"
+                                          Margin="0,0,0,12" />
+                                <CheckBox Content="Automatically check for updates on startup"
+                                          IsChecked="{Binding EnableAutoUpdateCheck, Mode=TwoWay}"
+                                          Margin="0,0,0,16" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Software Updates" FontWeight="Bold" />
+                                        <TextBlock Text="Check GitHub Releases and WinGet for new RigSwitch versions" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="🚀 Check for Updates" Command="{Binding CheckForUpdatesCommand}" Padding="12,6" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </StackPanel>

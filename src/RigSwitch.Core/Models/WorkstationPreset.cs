@@ -39,12 +39,15 @@ public sealed record WorkstationPreset
                 return;
             }
 
-            if (_targetMonitorIds.Count > 0)
+            int existingIndex = _targetMonitorIds.FindIndex(id => string.Equals(id, value, StringComparison.OrdinalIgnoreCase));
+            if (existingIndex >= 0)
             {
-                if (!_targetMonitorIds.Contains(value, StringComparer.OrdinalIgnoreCase))
-                {
-                    _targetMonitorIds[0] = value;
-                }
+                _targetMonitorIds.RemoveAt(existingIndex);
+                _targetMonitorIds.Insert(0, value);
+            }
+            else if (_targetMonitorIds.Count > 0)
+            {
+                _targetMonitorIds[0] = value;
             }
             else
             {

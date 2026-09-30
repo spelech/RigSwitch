@@ -2,6 +2,7 @@ namespace RigSwitch.Tests.Unit;
 
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using RigSwitch.App.ViewModels;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Models;
@@ -9,7 +10,7 @@ using RigSwitch.Core.Services;
 using RigSwitch.Infrastructure.Windows.Ccd;
 using Xunit;
 
-[Collection("WpfUi")]
+[Collection("WPF UI Tests")]
 public sealed class ReviewFixesTests
 {
     private readonly IDisplayConfigurationService _displayService;
@@ -279,6 +280,61 @@ public sealed class ReviewFixesTests
             window.SetExplicitShutdown();
             window.Close();
         });
+    }
+
+    [Fact]
+    public void WorkstationPreset_TargetMonitorId_Setter_MovesTargetToFrontAndDeduplicates()
+    {
+        var preset = new WorkstationPreset
+        {
+            TargetMonitorIds = ["MON1", "MON2", "MON3"]
+        };
+
+        // Act: set TargetMonitorId to "MON2" which is already present
+        preset.TargetMonitorId = "MON2";
+
+        // Assert: MON2 moved to front, no duplicate
+        Assert.Equal("MON2", preset.TargetMonitorId);
+        Assert.Equal(["MON2", "MON1", "MON3"], preset.TargetMonitorIds);
+
+        // Act: set new monitor (replaces primary monitor at index 0)
+        preset.TargetMonitorId = "MON4";
+        Assert.Equal("MON4", preset.TargetMonitorId);
+        Assert.Equal(["MON4", "MON1", "MON3"], preset.TargetMonitorIds);
+    }
+
+    [Fact]
+    public void DisplayMonitorTileViewModel_Constructor_SetsIsActiveCorrectly()
+    {
+        var tileActive = new DisplayMonitorTileViewModel(1, "MON1", "Monitor 1", MonitorPileAssignment.Desk, isPrimary: true, isActive: true);
+        var tileInactive = new DisplayMonitorTileViewModel(2, "MON2", "Monitor 2", MonitorPileAssignment.SimRig, isPrimary: false, isActive: false);
+
+        Assert.True(tileActive.IsActive);
+        Assert.True(tileActive.IsPrimary);
+        Assert.False(tileInactive.IsActive);
+        Assert.False(tileInactive.IsPrimary);
+    }
+
+    [Fact]
+    public void MainSettingsViewModel_IdentifyMonitors_WhenNoActiveMonitors_SetsStatusMessage()
+    {
+        var coordinator = Substitute.For<IProfileSwitchCoordinator>();
+        var trayService = new RigSwitch.App.Services.TrayIconService(coordinator, _settingsService);
+
+        using var vm = new MainSettingsViewModel(
+            coordinator,
+            _settingsService,
+            _displayService,
+            _audioDirector,
+            Substitute.For<IGlobalHotkeyService>(),
+            trayService);
+
+        // Populate with only inactive tiles
+        vm.MonitorTiles.Add(new DisplayMonitorTileViewModel(1, "M1", "Inactive 1", MonitorPileAssignment.Desk, isPrimary: false, isActive: false));
+
+        vm.IdentifyMonitors();
+
+        Assert.Equal("No active monitors to identify.", vm.StatusMessage);
     }
 
     private static readonly object AppInitLock = new();

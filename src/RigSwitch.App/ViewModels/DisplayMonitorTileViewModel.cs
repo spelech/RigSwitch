@@ -21,6 +21,7 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
     private int _displayNumber;
     private MonitorPileAssignment _pile;
     private bool _isPrimary;
+    private bool _isActive;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DisplayMonitorTileViewModel"/> class.
@@ -31,6 +32,7 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
         string? friendlyName,
         MonitorPileAssignment pile,
         bool isPrimary = false,
+        bool isActive = true,
         Action<DisplayMonitorTileViewModel, MonitorPileAssignment>? movePileAction = null)
     {
         _displayNumber = displayNumber;
@@ -38,6 +40,7 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
         FriendlyName = string.IsNullOrWhiteSpace(friendlyName) ? (monitorId ?? string.Empty) : friendlyName;
         _pile = pile;
         _isPrimary = isPrimary;
+        _isActive = isActive;
 
         MoveToUnassignedCommand = new RelayCommand(() => movePileAction?.Invoke(this, MonitorPileAssignment.Unassigned));
         MoveToDeskCommand = new RelayCommand(() => movePileAction?.Invoke(this, MonitorPileAssignment.Desk));
@@ -88,6 +91,15 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
     {
         get => _isPrimary;
         set => SetProperty(ref _isPrimary, value);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this display is currently active in the Windows display topology.
+    /// </summary>
+    public bool IsActive
+    {
+        get => _isActive;
+        set => SetProperty(ref _isActive, value);
     }
 
     public bool IsUnassigned => Pile == MonitorPileAssignment.Unassigned;

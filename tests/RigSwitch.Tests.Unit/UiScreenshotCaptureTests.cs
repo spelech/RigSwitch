@@ -13,7 +13,7 @@ using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Models;
 using Xunit;
 
-[Collection("WpfUi")]
+[Collection("WPF UI Tests")]
 public sealed class UiScreenshotCaptureTests
 {
     [Fact]

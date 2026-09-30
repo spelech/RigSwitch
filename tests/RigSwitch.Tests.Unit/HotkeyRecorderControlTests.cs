@@ -4,7 +4,10 @@ using System.Windows.Input;
 using RigSwitch.App.Controls;
 using Xunit;
 
-[Collection("WpfUi")]
+[CollectionDefinition("WPF UI Tests", DisableParallelization = true)]
+public class WpfUiTestGroup : ICollectionFixture<object> { }
+
+[Collection("WPF UI Tests")]
 public sealed class HotkeyRecorderControlTests
 {
     [Fact]

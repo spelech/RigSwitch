@@ -19,19 +19,42 @@ public partial class MainSettingsViewModel
         try
         {
             var screens = Screen.AllScreens;
-            for (int i = 0; i < MonitorTiles.Count; i++)
+            var activeTiles = MonitorTiles.Where(t => t.IsActive).ToList();
+            if (activeTiles.Count == 0)
             {
-                var tile = MonitorTiles[i];
-                var screen = (i < screens.Length) ? screens[i] : Screen.PrimaryScreen;
-                if (screen != null)
+                StatusMessage = "No active monitors to identify.";
+                return;
+            }
+
+            var primaryScreen = screens.FirstOrDefault(s => s.Primary) ?? Screen.PrimaryScreen;
+            var nonPrimaryScreens = screens.Where(s => s != primaryScreen).ToList();
+            int nonPrimaryScreenIdx = 0;
+
+            foreach (var tile in activeTiles)
+            {
+                Screen? targetScreen = null;
+                if (tile.IsPrimary && primaryScreen != null)
+                {
+                    targetScreen = primaryScreen;
+                }
+                else if (nonPrimaryScreenIdx < nonPrimaryScreens.Count)
+                {
+                    targetScreen = nonPrimaryScreens[nonPrimaryScreenIdx++];
+                }
+                else if (primaryScreen != null && screens.Length == 1)
+                {
+                    targetScreen = primaryScreen;
+                }
+
+                if (targetScreen != null)
                 {
                     var window = new IdentifyWindow(
                         tile.DisplayNumber,
                         tile.FriendlyName,
-                        screen.Bounds.Left,
-                        screen.Bounds.Top,
-                        screen.Bounds.Width,
-                        screen.Bounds.Height);
+                        targetScreen.Bounds.Left,
+                        targetScreen.Bounds.Top,
+                        targetScreen.Bounds.Width,
+                        targetScreen.Bounds.Height);
                     window.Show();
                 }
             }
@@ -72,6 +95,7 @@ public partial class MainSettingsViewModel
                 friendlyName: display.FriendlyName,
                 pile: pile,
                 isPrimary: display.IsPrimary,
+                isActive: display.IsActive,
                 movePileAction: OnTilePileMoved);
 
             MonitorTiles.Add(tile);

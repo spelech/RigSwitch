@@ -1,6 +1,7 @@
 namespace RigSwitch.App.Views;
 
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 /// <summary>
@@ -17,10 +18,14 @@ public partial class IdentifyWindow : Window
         NumberText.Text = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
         NameText.Text = name;
 
-        Left = left;
-        Top = top;
-        Width = width;
-        Height = height;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+        double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+        Left = left / dpiX;
+        Top = top / dpiY;
+        Width = width / dpiX;
+        Height = height / dpiY;
 
         _timer = new DispatcherTimer
         {
