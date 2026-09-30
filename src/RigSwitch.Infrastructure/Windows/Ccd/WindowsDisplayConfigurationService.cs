@@ -108,12 +108,17 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
     }
 
     /// <inheritdoc/>
-    public Task ApplySingleDisplayTopologyAsync(
-        string targetMonitorId,
-        string? inactiveMonitorId,
+    public Task ApplyDisplayTopologyAsync(
+        IReadOnlyList<string> targetMonitorIds,
+        IReadOnlyList<string>? inactiveMonitorIds = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetMonitorId);
+        ArgumentNullException.ThrowIfNull(targetMonitorIds);
+        if (targetMonitorIds.Count == 0)
+        {
+            throw new ArgumentException("At least one target monitor ID must be provided.", nameof(targetMonitorIds));
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         int queryResult = _ccdProvider.QueryDisplayConfig(QueryDisplayFlags.QDC_ALL_PATHS, out var paths, out var modes);
@@ -147,66 +152,86 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
             }
         }
 
-        int targetIndex = -1;
-        for (int i = 0; i < paths.Length; i++)
+        var targetIndices = new List<int>();
+        foreach (var targetId in targetMonitorIds)
         {
-            var (monId, devPath, friendly) = pathTargetInfos[i];
-            if (MatchesMonitor(targetMonitorId, monId, devPath, friendly))
+            if (string.IsNullOrWhiteSpace(targetId))
             {
-                if (targetIndex == -1 || (paths[i].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                continue;
+            }
+
+            int matchIdx = -1;
+            for (int i = 0; i < paths.Length; i++)
+            {
+                var (monId, devPath, friendly) = pathTargetInfos[i];
+                if (MatchesMonitor(targetId, monId, devPath, friendly))
                 {
-                    targetIndex = i;
+                    if (matchIdx == -1 || (paths[i].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                    {
+                        matchIdx = i;
+                    }
                 }
+            }
+
+            if (matchIdx == -1)
+            {
+                throw new InvalidOperationException($"Target monitor '{targetId}' was not found on system.");
+            }
+
+            if (!targetIndices.Contains(matchIdx))
+            {
+                targetIndices.Add(matchIdx);
             }
         }
 
-        if (targetIndex == -1)
+        if (targetIndices.Count == 0)
         {
-            throw new InvalidOperationException($"Target monitor '{targetMonitorId}' was not found on system.");
+            throw new InvalidOperationException("None of the specified target monitors were found on the system.");
         }
 
         var clonedPaths = (DISPLAYCONFIG_PATH_INFO[])paths.Clone();
         var clonedModes = (DISPLAYCONFIG_MODE_INFO[])modes.Clone();
 
-        // Enable target path
-        clonedPaths[targetIndex].flags = NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE;
-
-        // Clear active flags on other paths matching target monitor
+        // Step 1: Disable all paths by default or matching inactives
         for (int i = 0; i < clonedPaths.Length; i++)
         {
-            if (i != targetIndex)
+            if (targetIndices.Contains(i))
+            {
+                continue;
+            }
+
+            if (inactiveMonitorIds != null && inactiveMonitorIds.Count > 0)
             {
                 var (monId, devPath, friendly) = pathTargetInfos[i];
-                if (MatchesMonitor(targetMonitorId, monId, devPath, friendly))
+                bool isInactive = inactiveMonitorIds.Any(inact => MatchesMonitor(inact, monId, devPath, friendly));
+                if (isInactive)
                 {
                     clonedPaths[i].flags = 0;
                 }
             }
-        }
-
-        // If inactiveMonitorId provided, clear DISPLAYCONFIG_PATH_ACTIVE (set flags = 0)
-        if (!string.IsNullOrWhiteSpace(inactiveMonitorId))
-        {
-            for (int i = 0; i < clonedPaths.Length; i++)
+            else
             {
-                if (i == targetIndex)
-                {
-                    continue;
-                }
-
-                var (monId, devPath, friendly) = pathTargetInfos[i];
-                if (MatchesMonitor(inactiveMonitorId, monId, devPath, friendly))
-                {
-                    clonedPaths[i].flags = 0;
-                }
+                // Clear active flag for non-target paths if inactive list not specified
+                clonedPaths[i].flags = 0;
             }
         }
 
-        // Updates source position of target to (0, 0) as primary
-        uint modeIdx = clonedPaths[targetIndex].sourceInfo.modeInfoIdx;
-        if (modeIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID && modeIdx < clonedModes.Length)
+        // Step 2: Enable target paths and arrange linearly (first target at (0,0) as primary)
+        int currentX = 0;
+        for (int tIdx = 0; tIdx < targetIndices.Count; tIdx++)
         {
-            clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL { x = 0, y = 0 };
+            int pIndex = targetIndices[tIdx];
+            clonedPaths[pIndex].flags = NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE;
+
+            uint modeIdx = clonedPaths[pIndex].sourceInfo.modeInfoIdx;
+            if (modeIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID && modeIdx < clonedModes.Length)
+            {
+                clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL { x = currentX, y = 0 };
+
+                // If width is known and positive, advance currentX; otherwise increment by default width (1920)
+                int width = (int)clonedModes[modeIdx].modeInfo.sourceMode.width;
+                currentX += width > 0 ? width : 1920;
+            }
         }
 
         var flags = SetDisplayConfigFlags.SDC_APPLY |
@@ -221,6 +246,18 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task ApplySingleDisplayTopologyAsync(
+        string targetMonitorId,
+        string? inactiveMonitorId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetMonitorId);
+        var targetList = new[] { targetMonitorId };
+        var inactiveList = string.IsNullOrWhiteSpace(inactiveMonitorId) ? null : new[] { inactiveMonitorId };
+        return ApplyDisplayTopologyAsync(targetList, inactiveList, cancellationToken);
     }
 
     private static string ExtractMonitorId(in DISPLAYCONFIG_TARGET_DEVICE_NAME targetName)

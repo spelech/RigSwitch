@@ -44,8 +44,9 @@ winget upgrade spelech.RigSwitch
 
 ## ⚡ Key Features
 
-* 🖥️ **Instant Display Topology Switching**: Leverages low-level Win32 Connecting and Configuring Displays (CCD) APIs (`SetDisplayConfig`) to enable the target screen and disable the inactive screen atomically.
-* 🛡️ **Fail-Safe Safety Gates**: Verifies that the target display is physically connected and recognized by the GPU before altering topology, eliminating black-screen lockout risk.
+* 🖥️ **Instant Multi-Monitor Topology Switching**: Leverages low-level Win32 Connecting and Configuring Displays (CCD) APIs (`SetDisplayConfig`) to enable single, dual, or 3-screen triple-monitor setups for sim rigs or workstations while disabling inactive screens atomically.
+* 🔍 **Windows-Style Monitor Identification & Drag-and-Drop**: Identify monitors instantly with full-screen OS numbers (1, 2, 3...) and drag/assign numbered monitor tiles into Desk or Sim Rig piles.
+* 🛡️ **Fail-Safe Safety Gates**: Verifies that all configured target displays are physically connected and recognized by the GPU before altering topology, eliminating black-screen lockout risk.
 * 🎛️ **Multi-Preset Workstation Engine**: Configure up to 3 custom presets per environment (e.g. *GT3 / Circuit*, *Rally / Drift*, *Flight / Space* on the Sim Rig; *Work* vs *Gaming* on the Desk), each with dedicated display, audio routing, direct hotkeys, and app hooks.
 * 🚀 **Application Lifecycle Hooks**: Automatically launch specialized applications (e.g. Moza Pit House, SimHub, CrewChief) when entering a preset, and gracefully close them when switching away.
 * ⌨️ **Interactive Hotkey Recorder**: Press 2- or 3-key combinations directly to record and bind global shortcuts (`Ctrl+Alt+S`, `Alt+F1`, etc.) without manual typing.
@@ -72,10 +73,10 @@ winget upgrade spelech.RigSwitch
 
 Profiles are configured per PC directly from the Settings GUI. Detected monitors and audio devices appear in dropdown menus:
 
-| Profile | Active Display | Inactive Display | Primary Audio | Fallback Audio |
+| Profile | Active Displays | Inactive Displays | Primary Audio | Fallback Audio |
 | :--- | :--- | :--- | :--- | :--- |
-| **Desk Setup** | Workstation Monitor | Simulator Display | Primary Desk Speakers / DAC | Secondary Audio / Monitor Line-Out |
-| **Sim Rig Setup** | Simulator / Ultrawide Display | Workstation Monitor | Sim Rig Audio / DAC | *(Optional)* |
+| **Desk Setup** | Workstation Displays (1–N) | Simulator Displays | Primary Desk Speakers / DAC | Secondary Audio / Monitor Line-Out |
+| **Sim Rig Setup** | Simulator Displays (Single / Triple Rig) | Workstation Displays | Sim Rig Audio / DAC | *(Optional)* |
 
 ---
 

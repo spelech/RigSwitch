@@ -162,6 +162,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         SwitchToRigCommand = new AsyncRelayCommand(() => SwitchProfileAsync(ProfileMode.SimRig), () => !IsBusy);
         SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync, () => !IsBusy);
         RefreshDevicesCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsBusy);
+        IdentifyMonitorsCommand = new RelayCommand(IdentifyMonitors);
         CheckForUpdatesCommand = new AsyncRelayCommand(() => CheckForUpdatesManualAsync(), () => !IsBusy);
 
         SelectAllAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "All");
@@ -264,6 +265,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 bool isVisible = !hiddenList.Any(hId => DeviceOptionResolver.MatchesEndpoint(hId, a.Id));
                 AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(a.Id, a.Name, a.AdapterDescription, isVisible, OnAudioVisibilityChangedAsync, a.State));
             }
+
+            PopulateMonitorTiles(displays, _settings);
 
             StatusMessage = "Devices and configuration loaded.";
         }

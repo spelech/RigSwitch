@@ -15,10 +15,46 @@ public sealed record WorkstationPreset
     /// </summary>
     public string Name { get; set; } = "Default Preset";
 
+    private List<string> _targetMonitorIds = [];
+
     /// <summary>
-    /// Gets or sets the target monitor hardware identifier or EDID.
+    /// Gets or sets the list of target monitor hardware identifiers or EDIDs assigned to this preset.
     /// </summary>
-    public string TargetMonitorId { get; set; } = string.Empty;
+    public List<string> TargetMonitorIds
+    {
+        get => _targetMonitorIds;
+        set => _targetMonitorIds = value ?? [];
+    }
+
+    /// <summary>
+    /// Gets or sets the primary target monitor hardware identifier or EDID for backwards compatibility.
+    /// </summary>
+    public string TargetMonitorId
+    {
+        get => _targetMonitorIds.Count > 0 ? _targetMonitorIds[0] : string.Empty;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            int existingIndex = _targetMonitorIds.FindIndex(id => string.Equals(id, value, StringComparison.OrdinalIgnoreCase));
+            if (existingIndex >= 0)
+            {
+                _targetMonitorIds.RemoveAt(existingIndex);
+                _targetMonitorIds.Insert(0, value);
+            }
+            else if (_targetMonitorIds.Count > 0)
+            {
+                _targetMonitorIds[0] = value;
+            }
+            else
+            {
+                _targetMonitorIds.Add(value);
+            }
+        }
+    }
 
     /// <summary>
     /// Gets or sets the primary audio endpoint device identifier.

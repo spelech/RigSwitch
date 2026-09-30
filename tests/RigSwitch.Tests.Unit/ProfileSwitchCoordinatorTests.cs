@@ -95,7 +95,7 @@ public sealed class ProfileSwitchCoordinatorTests
         {
             _settingsService.LoadSettingsAsync(Arg.Any<CancellationToken>());
             _displayService.EnumerateDisplaysAsync(Arg.Any<CancellationToken>());
-            _displayService.ApplySingleDisplayTopologyAsync(RigMonitorId, DeskMonitorId, Arg.Any<CancellationToken>());
+            _displayService.ApplyDisplayTopologyAsync(Arg.Is<IReadOnlyList<string>>(list => list.Contains(RigMonitorId)), Arg.Is<IReadOnlyList<string>?>(list => list != null && list.Contains(DeskMonitorId)), Arg.Any<CancellationToken>());
             _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>());
             _audioDirector.SetDefaultPlaybackEndpointAsync(RigPrimaryAudioId, Arg.Any<CancellationToken>());
             _audioDirector.SyncHiddenEndpointsAsync(_defaultSettings.HiddenAudioEndpointIds, Arg.Any<CancellationToken>());
@@ -129,7 +129,7 @@ public sealed class ProfileSwitchCoordinatorTests
         Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
 
         await _displayService.DidNotReceiveWithAnyArgs()
-            .ApplySingleDisplayTopologyAsync(default!, default, default);
+            .ApplyDisplayTopologyAsync(default!, default, default);
         await _audioDirector.DidNotReceiveWithAnyArgs()
             .SetDefaultPlaybackEndpointAsync(default!, default);
         await _settingsService.DidNotReceiveWithAnyArgs()
@@ -308,7 +308,7 @@ public sealed class ProfileSwitchCoordinatorTests
     public async Task SwitchProfileAsync_WhenDisplayServiceThrows_FiresFailureEventAndReturnsFalse()
     {
         // Arrange
-        _displayService.ApplySingleDisplayTopologyAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _displayService.ApplyDisplayTopologyAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<IReadOnlyList<string>?>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("CCD SetDisplayConfig failed with error 87"));
 
         using var coordinator = new ProfileSwitchCoordinator(
@@ -463,7 +463,7 @@ public sealed class ProfileSwitchCoordinatorTests
         // Assert
         Assert.Equal(ProfileMode.SimRig, coordinator.CurrentProfile);
         Assert.Equal(2, coordinator.CurrentPresetIndex);
-        _displayService.DidNotReceiveWithAnyArgs().ApplySingleDisplayTopologyAsync(default!, default, default);
+        _displayService.DidNotReceiveWithAnyArgs().ApplyDisplayTopologyAsync(default!, default, default);
         _audioDirector.DidNotReceiveWithAnyArgs().SetDefaultPlaybackEndpointAsync(default!, default);
     }
 }

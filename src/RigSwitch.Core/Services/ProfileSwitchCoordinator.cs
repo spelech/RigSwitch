@@ -117,10 +117,12 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                 ? ProfileMode.SimRig
                 : ProfileMode.Desk;
             var inactivePreset = settings.GetActivePreset(inactiveProfile);
-            var inactiveMonitorId = inactivePreset.TargetMonitorId;
+            var inactiveMonitorIds = inactivePreset.TargetMonitorIds;
+
+            var targetMonitorIds = preset.TargetMonitorIds.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
 
             // Step 2: Safety Gate (Reachability Verification)
-            if (string.IsNullOrWhiteSpace(preset.TargetMonitorId))
+            if (targetMonitorIds.Count == 0)
             {
                 var errorMsg = $"No target display configured for profile '{targetProfile}'. Please select your display in Settings.";
                 ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, activePreset: preset, success: false, errorMessage: errorMsg));
@@ -128,17 +130,17 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             }
 
             var displays = await _displayConfigService.EnumerateDisplaysAsync(cancellationToken).ConfigureAwait(false);
-            var isTargetPresent = IsDisplayConnected(preset.TargetMonitorId, displays);
+            var missingMonitors = targetMonitorIds.Where(id => !IsDisplayConnected(id, displays)).ToList();
 
-            if (!isTargetPresent)
+            if (missingMonitors.Count > 0)
             {
-                var errorMsg = $"Target monitor '{preset.TargetMonitorId}' for profile '{targetProfile}' was not found among connected displays.";
+                var errorMsg = $"Target monitor(s) '{string.Join(", ", missingMonitors)}' for profile '{targetProfile}' was not found among connected displays.";
                 ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(previousProfile, targetProfile, activePreset: preset, success: false, errorMessage: errorMsg));
                 return false;
             }
 
             // Step 3: Apply Display Topology
-            await _displayConfigService.ApplySingleDisplayTopologyAsync(preset.TargetMonitorId, inactiveMonitorId, cancellationToken).ConfigureAwait(false);
+            await _displayConfigService.ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken).ConfigureAwait(false);
 
             // Step 4: Multi-tier Audio Resolution & Routing
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
