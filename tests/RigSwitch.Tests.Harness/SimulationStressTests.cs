@@ -325,4 +325,166 @@ public sealed class SimulationStressTests
         Assert.True(context.IsMonitorActive(targetPreset.TargetMonitorId));
         Assert.Equal(targetPreset.PrimaryAudioId, context.ActiveDefaultAudioId);
     }
+
+    [Fact]
+    public async Task EndToEnd_WorkstationPresetTransition_AppliesDisplayTopology_Hdr_MicrophoneRouting_And_VolumeControls()
+    {
+        // Arrange: Configure full realistic setup for Desk vs SimRig presets
+        var context = new SimulationDisturbanceContext();
+
+        var deskPreset = context.Settings.DeskPresets[0];
+        deskPreset.TargetMonitorId = context.Settings.DeskMonitorId;
+        deskPreset.HdrMode = PresetHdrMode.Disable;
+        deskPreset.PrimaryAudioId = context.Settings.DeskPrimaryAudioId;
+        deskPreset.PlaybackVolume = new AudioVolumeSettings
+        {
+            Mode = PresetVolumeBehavior.Custom,
+            VolumePercent = 35,
+            IsMuted = false,
+        };
+        deskPreset.PrimaryMicrophoneId = "{MIC-DESK-GUID}";
+        deskPreset.MicrophoneVolume = new AudioVolumeSettings
+        {
+            Mode = PresetVolumeBehavior.Custom,
+            VolumePercent = 80,
+            IsMuted = false,
+        };
+
+        var rigPreset = context.Settings.RigPresets[0];
+        rigPreset.TargetMonitorId = context.Settings.RigMonitorId;
+        rigPreset.HdrMode = PresetHdrMode.Enable;
+        rigPreset.PrimaryAudioId = context.Settings.RigPrimaryAudioId;
+        rigPreset.PlaybackVolume = new AudioVolumeSettings
+        {
+            Mode = PresetVolumeBehavior.Custom,
+            VolumePercent = 65,
+            IsMuted = false,
+        };
+        rigPreset.PrimaryMicrophoneId = "{MIC-RIG-GUID}";
+        rigPreset.FallbackMicrophoneId = "{MIC-FALLBACK-GUID}";
+        rigPreset.MicrophoneVolume = new AudioVolumeSettings
+        {
+            Mode = PresetVolumeBehavior.Custom,
+            VolumePercent = 100,
+            IsMuted = true,
+        };
+
+        using var coordinator = context.CreateCoordinator(initialProfile: ProfileMode.Desk);
+
+        // Step 1: Switch to Desk profile and assert complete Desk state
+        var deskSuccess = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 0);
+        Assert.True(deskSuccess);
+
+        // Verify Display & HDR
+        Assert.True(context.IsMonitorActive(context.Settings.DeskMonitorId));
+        Assert.False(context.IsMonitorActive(context.Settings.RigMonitorId));
+        Assert.False(context.IsHdrEnabled(context.Settings.DeskMonitorId));
+
+        // Verify Playback Audio & Volume
+        Assert.Equal(context.Settings.DeskPrimaryAudioId, context.ActiveDefaultAudioId);
+        var deskPlaybackVol = context.GetEndpointVolume(context.Settings.DeskPrimaryAudioId);
+        Assert.NotNull(deskPlaybackVol);
+        Assert.Equal(35, deskPlaybackVol.Value.VolumePercent);
+        Assert.False(deskPlaybackVol.Value.IsMuted);
+
+        // Verify Capture Audio & Volume
+        Assert.Equal("{MIC-DESK-GUID}", context.ActiveDefaultCaptureId);
+        var deskCaptureVol = context.GetEndpointVolume("{MIC-DESK-GUID}");
+        Assert.NotNull(deskCaptureVol);
+        Assert.Equal(80, deskCaptureVol.Value.VolumePercent);
+        Assert.False(deskCaptureVol.Value.IsMuted);
+
+        // Step 2: Switch to SimRig profile and assert complete SimRig state
+        var rigSuccess = await coordinator.SwitchProfileAsync(ProfileMode.SimRig);
+        Assert.True(rigSuccess);
+        Assert.Equal(ProfileMode.SimRig, coordinator.CurrentProfile);
+
+        // Verify Display Topology & HDR state
+        Assert.True(context.IsMonitorActive(context.Settings.RigMonitorId));
+        Assert.False(context.IsMonitorActive(context.Settings.DeskMonitorId));
+        Assert.True(context.IsHdrEnabled(context.Settings.RigMonitorId));
+
+        // Verify Playback Audio & Volume
+        Assert.Equal(context.Settings.RigPrimaryAudioId, context.ActiveDefaultAudioId);
+        var rigPlaybackVol = context.GetEndpointVolume(context.Settings.RigPrimaryAudioId);
+        Assert.NotNull(rigPlaybackVol);
+        Assert.Equal(65, rigPlaybackVol.Value.VolumePercent);
+        Assert.False(rigPlaybackVol.Value.IsMuted);
+
+        // Verify Capture Audio & Volume (Muted for sim racing immersion)
+        Assert.Equal("{MIC-RIG-GUID}", context.ActiveDefaultCaptureId);
+        var rigCaptureVol = context.GetEndpointVolume("{MIC-RIG-GUID}");
+        Assert.NotNull(rigCaptureVol);
+        Assert.Equal(100, rigCaptureVol.Value.VolumePercent);
+        Assert.True(rigCaptureVol.Value.IsMuted);
+
+        // Step 3: Disturbance - Unplug Rig Mic and re-apply; verify graceful fallback to secondary mic
+        context.SimulateAudioDisconnect("{MIC-RIG-GUID}");
+        var fallbackSwitchSuccess = await coordinator.SwitchToPresetAsync(ProfileMode.SimRig, 0);
+        Assert.True(fallbackSwitchSuccess);
+
+        // Verify capture routed to fallback microphone and configured volume applied to fallback
+        Assert.Equal("{MIC-FALLBACK-GUID}", context.ActiveDefaultCaptureId);
+        var fallbackCaptureVol = context.GetEndpointVolume("{MIC-FALLBACK-GUID}");
+        Assert.NotNull(fallbackCaptureVol);
+        Assert.Equal(100, fallbackCaptureVol.Value.VolumePercent);
+        Assert.True(fallbackCaptureVol.Value.IsMuted);
+
+        // Step 4: Verification of persistent storage state
+        var savedSettings = await context.SettingsStorage.LoadSettingsAsync();
+        Assert.Equal(ProfileMode.SimRig, savedSettings.LastActiveProfile);
+        Assert.Equal(PresetHdrMode.Enable, savedSettings.RigPresets[0].HdrMode);
+        Assert.Equal(65, savedSettings.RigPresets[0].PlaybackVolume.VolumePercent);
+        Assert.Equal("{MIC-RIG-GUID}", savedSettings.RigPresets[0].PrimaryMicrophoneId);
+        Assert.Equal("{MIC-FALLBACK-GUID}", savedSettings.RigPresets[0].FallbackMicrophoneId);
+        Assert.True(savedSettings.RigPresets[0].MicrophoneVolume.IsMuted);
+    }
+
+    [Fact]
+    public async Task EndToEnd_VolumeRetainBehavior_PreservesEndpointVolumeAcrossProfileTransitions()
+    {
+        // Arrange
+        var context = new SimulationDisturbanceContext();
+
+        // Seed initial endpoint volumes
+        await context.AudioDirector.SetEndpointVolumeAsync(context.Settings.DeskPrimaryAudioId, 42, false);
+        await context.AudioDirector.SetEndpointVolumeAsync("{MIC-DESK-GUID}", 77, false);
+
+        var deskPreset = context.Settings.DeskPresets[0];
+        deskPreset.TargetMonitorId = context.Settings.DeskMonitorId;
+        deskPreset.PrimaryAudioId = context.Settings.DeskPrimaryAudioId;
+        deskPreset.PlaybackVolume = new AudioVolumeSettings
+        {
+            Mode = PresetVolumeBehavior.Retain,
+            VolumePercent = 99, // Should NOT be applied
+            IsMuted = true,      // Should NOT be applied
+        };
+        deskPreset.PrimaryMicrophoneId = "{MIC-DESK-GUID}";
+        deskPreset.MicrophoneVolume = new AudioVolumeSettings
+        {
+            Mode = PresetVolumeBehavior.Retain,
+            VolumePercent = 10, // Should NOT be applied
+            IsMuted = true,      // Should NOT be applied
+        };
+
+        using var coordinator = context.CreateCoordinator(initialProfile: ProfileMode.SimRig);
+
+        // Act: Switch to Desk with Retain volume behavior
+        var success = await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        // Assert
+        Assert.True(success);
+        Assert.Equal(context.Settings.DeskPrimaryAudioId, context.ActiveDefaultAudioId);
+        Assert.Equal("{MIC-DESK-GUID}", context.ActiveDefaultCaptureId);
+
+        var playbackVol = context.GetEndpointVolume(context.Settings.DeskPrimaryAudioId);
+        Assert.NotNull(playbackVol);
+        Assert.Equal(42, playbackVol.Value.VolumePercent);
+        Assert.False(playbackVol.Value.IsMuted);
+
+        var captureVol = context.GetEndpointVolume("{MIC-DESK-GUID}");
+        Assert.NotNull(captureVol);
+        Assert.Equal(77, captureVol.Value.VolumePercent);
+        Assert.False(captureVol.Value.IsMuted);
+    }
 }

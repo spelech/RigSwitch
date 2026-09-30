@@ -271,4 +271,113 @@ public sealed class CoreAudioEndpointDirectorTests
 
         Assert.Same(expectedException, ex);
     }
+
+    [Fact]
+    public async Task EnumerateAudioEndpointsAsync_WithCaptureFlow_ReturnsOnlyCaptureEndpoints()
+    {
+        // Arrange
+        var captureEndpoints = new List<AudioEndpointInfo>
+        {
+            new(
+                id: "{0.0.1.00000000}.{MIC-1}",
+                name: "Boom Microphone",
+                adapterDescription: "Realtek Audio",
+                state: DevicePresenceState.Active,
+                isDefaultPlayback: false,
+                isDefaultCommunications: true,
+                flow: AudioDeviceFlow.Capture,
+                isDefaultCapture: true)
+        };
+
+        _audioProvider.EnumerateCaptureEndpoints().Returns(captureEndpoints);
+
+        // Act
+        var result = await _director.EnumerateAudioEndpointsAsync(AudioDeviceFlow.Capture);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("{0.0.1.00000000}.{MIC-1}", result[0].Id);
+        Assert.Equal(AudioDeviceFlow.Capture, result[0].Flow);
+        Assert.True(result[0].IsDefaultCapture);
+        _audioProvider.Received(1).EnumerateCaptureEndpoints();
+        _audioProvider.DidNotReceive().EnumerateRenderEndpoints();
+    }
+
+    [Fact]
+    public async Task EnumerateAudioEndpointsAsync_WithNullFlow_ReturnsBothRenderAndCaptureEndpoints()
+    {
+        // Arrange
+        var renderEndpoints = new List<AudioEndpointInfo>
+        {
+            new("RENDER-1", "Speakers", "Realtek", DevicePresenceState.Active, true, false, AudioDeviceFlow.Playback, false)
+        };
+        var captureEndpoints = new List<AudioEndpointInfo>
+        {
+            new("CAPTURE-1", "Mic", "USB", DevicePresenceState.Active, false, true, AudioDeviceFlow.Capture, true)
+        };
+
+        _audioProvider.EnumerateRenderEndpoints().Returns(renderEndpoints);
+        _audioProvider.EnumerateCaptureEndpoints().Returns(captureEndpoints);
+
+        // Act
+        var result = await _director.EnumerateAudioEndpointsAsync();
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, x => x.Id == "RENDER-1");
+        Assert.Contains(result, x => x.Id == "CAPTURE-1");
+        _audioProvider.Received(1).EnumerateRenderEndpoints();
+        _audioProvider.Received(1).EnumerateCaptureEndpoints();
+    }
+
+    [Fact]
+    public async Task SetDefaultCaptureEndpointAsync_SetsConsoleMultimediaAndCommunications()
+    {
+        // Arrange
+        const string targetId = "{0.0.1.00000000}.{TARGET-MIC}";
+
+        // Act
+        await _director.SetDefaultCaptureEndpointAsync(targetId);
+
+        // Assert
+        _audioProvider.Received(1).SetDefaultEndpoint(targetId, ERole.eConsole);
+        _audioProvider.Received(1).SetDefaultEndpoint(targetId, ERole.eMultimedia);
+        _audioProvider.Received(1).SetDefaultEndpoint(targetId, ERole.eCommunications);
+    }
+
+    [Theory]
+    [InlineData(75, false, 0.75f, false)]
+    [InlineData(0, true, 0.0f, true)]
+    [InlineData(100, false, 1.0f, false)]
+    [InlineData(-10, false, 0.0f, false)] // Clamped lower
+    [InlineData(150, true, 1.0f, true)]   // Clamped upper
+    public async Task SetEndpointVolumeAsync_ClampsScalarAndInvokesProvider(int volumePercent, bool isMuted, float expectedScalar, bool expectedMute)
+    {
+        // Arrange
+        const string endpointId = "{ENDPOINT-VOL}";
+
+        // Act
+        await _director.SetEndpointVolumeAsync(endpointId, volumePercent, isMuted);
+
+        // Assert
+        _audioProvider.Received(1).SetEndpointVolume(
+            endpointId,
+            Arg.Is<float>(v => Math.Abs(v - expectedScalar) < 0.001f),
+            expectedMute);
+    }
+
+    [Fact]
+    public async Task GetEndpointVolumeAsync_TranslatesScalarToPercentage()
+    {
+        // Arrange
+        const string endpointId = "{ENDPOINT-VOL}";
+        _audioProvider.GetEndpointVolume(endpointId).Returns((0.68f, true));
+
+        // Act
+        var (volumePercent, isMuted) = await _director.GetEndpointVolumeAsync(endpointId);
+
+        // Assert
+        Assert.Equal(68, volumePercent);
+        Assert.True(isMuted);
+    }
 }

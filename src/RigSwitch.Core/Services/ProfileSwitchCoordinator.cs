@@ -142,13 +142,104 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             // Step 3: Apply Display Topology
             await _displayConfigService.ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken).ConfigureAwait(false);
 
+            // Step 3B: Apply Native HDR Mode (if configured)
+            if (preset.HdrMode != PresetHdrMode.Retain)
+            {
+                bool enableHdr = preset.HdrMode == PresetHdrMode.Enable;
+                foreach (var monitorId in targetMonitorIds)
+                {
+                    try
+                    {
+                        await _displayConfigService.SetHdrStateAsync(monitorId, enableHdr, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to apply HDR mode ({preset.HdrMode}) on monitor '{monitorId}': {ex.Message}");
+                    }
+                }
+            }
+
             // Step 4: Multi-tier Audio Resolution & Routing
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
-            var resolvedAudioId = ResolveAudioEndpoint(preset.PrimaryAudioId, preset.FallbackAudioId, endpoints);
+            var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
+            var playbackEndpoints = endpointList.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
+            var captureEndpoints = endpointList.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
+            var resolvedAudioId = ResolveAudioEndpoint(preset.PrimaryAudioId, preset.FallbackAudioId, playbackEndpoints);
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
             {
                 await _audioDirector.SetDefaultPlaybackEndpointAsync(resolvedAudioId, cancellationToken).ConfigureAwait(false);
+            }
+
+            var resolvedMicId = ResolveAudioEndpoint(preset.PrimaryMicrophoneId, preset.FallbackMicrophoneId, captureEndpoints);
+            if (!string.IsNullOrWhiteSpace(resolvedMicId))
+            {
+                await _audioDirector.SetDefaultCaptureEndpointAsync(resolvedMicId, cancellationToken).ConfigureAwait(false);
+            }
+
+            // Apply Volume Controls (if configured)
+            if (preset.PlaybackVolume.Mode == PresetVolumeBehavior.Custom)
+            {
+                var targetPlaybackId = resolvedAudioId;
+                if (string.IsNullOrWhiteSpace(targetPlaybackId))
+                {
+                    targetPlaybackId = playbackEndpoints.FirstOrDefault(e => e.IsDefaultPlayback)?.Id
+                        ?? endpointList.FirstOrDefault(e => e.Flow == AudioDeviceFlow.Playback && e.State == DevicePresenceState.Active)?.Id;
+                }
+
+                if (!string.IsNullOrWhiteSpace(targetPlaybackId))
+                {
+                    try
+                    {
+                        await _audioDirector.SetEndpointVolumeAsync(
+                            targetPlaybackId,
+                            preset.PlaybackVolume.VolumePercent,
+                            preset.PlaybackVolume.IsMuted,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to apply playback volume for preset '{preset.Name}': {ex.Message}");
+                    }
+                }
+            }
+
+            if (preset.MicrophoneVolume.Mode == PresetVolumeBehavior.Custom)
+            {
+                var targetMicId = resolvedMicId;
+                if (string.IsNullOrWhiteSpace(targetMicId))
+                {
+                    targetMicId = captureEndpoints.FirstOrDefault(e => e.IsDefaultCapture)?.Id
+                        ?? endpointList.FirstOrDefault(e => e.Flow == AudioDeviceFlow.Capture && e.State == DevicePresenceState.Active)?.Id;
+                }
+
+                if (!string.IsNullOrWhiteSpace(targetMicId))
+                {
+                    try
+                    {
+                        await _audioDirector.SetEndpointVolumeAsync(
+                            targetMicId,
+                            preset.MicrophoneVolume.VolumePercent,
+                            preset.MicrophoneVolume.IsMuted,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to apply microphone volume for preset '{preset.Name}': {ex.Message}");
+                    }
+                }
             }
 
             if (settings.HiddenAudioEndpointIds is { Count: > 0 })

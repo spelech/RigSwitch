@@ -1,5 +1,7 @@
 namespace RigSwitch.Core.Models;
 
+using RigSwitch.Core.Enums;
+
 /// <summary>
 /// Represents a customizable hardware and software configuration preset within a workstation profile.
 /// </summary>
@@ -65,6 +67,31 @@ public sealed record WorkstationPreset
     /// Gets or sets the fallback audio endpoint device identifier.
     /// </summary>
     public string FallbackAudioId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the primary microphone / capture endpoint device identifier.
+    /// </summary>
+    public string PrimaryMicrophoneId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the fallback microphone / capture endpoint device identifier.
+    /// </summary>
+    public string FallbackMicrophoneId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the target playback audio volume and mute settings for this preset.
+    /// </summary>
+    public AudioVolumeSettings PlaybackVolume { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the target microphone input volume and mute settings for this preset.
+    /// </summary>
+    public AudioVolumeSettings MicrophoneVolume { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the native Windows HDR (Advanced Color) switching mode for this preset.
+    /// </summary>
+    public PresetHdrMode HdrMode { get; set; } = PresetHdrMode.Retain;
 
     /// <summary>
     /// Gets or sets the direct hotkey combination used to activate this preset.

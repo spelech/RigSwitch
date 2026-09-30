@@ -527,4 +527,196 @@ public sealed class WindowsDisplayConfigurationServiceTests
         await Assert.ThrowsAnyAsync<ArgumentException>(() =>
             service.ApplySingleDisplayTopologyAsync(invalidTargetId!, null));
     }
+
+    [Fact]
+    public async Task GetHdrInfoAsync_ReturnsCorrectHdrMetadataWhenSupported()
+    {
+        // Arrange
+        SetupSingleDisplayPaths("MSI4DD0", targetId: 101);
+
+        var dummyColor = Arg.Any<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>();
+        _ccdProvider.GetAdvancedColorInfo(ref dummyColor).Returns(x =>
+        {
+            var info = (DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO)x[0];
+            info.value = 0x3; // advancedColorSupported (bit 0) | advancedColorEnabled (bit 1)
+            info.colorEncoding = DISPLAYCONFIG_COLOR_ENCODING.DISPLAYCONFIG_COLOR_ENCODING_RGB;
+            info.bitsPerColorChannel = 10;
+            x[0] = info;
+            return 0;
+        });
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act
+        var result = await service.GetHdrInfoAsync("MSI4DD0");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("MSI4DD0", result.MonitorId);
+        Assert.True(result.SupportsHdr);
+        Assert.True(result.IsHdrEnabled);
+        Assert.Equal(RigSwitch.Core.Enums.DisplayColorEncoding.Rgb, result.ColorEncoding);
+        Assert.Equal(10, result.BitsPerColorChannel);
+    }
+
+    [Fact]
+    public async Task SetHdrStateAsync_WhenAlreadyInDesiredState_PerformsNoOpWithoutCallingNativeSet()
+    {
+        // Arrange (Monitor already has HDR enabled)
+        SetupSingleDisplayPaths("MSI4DD0", targetId: 101);
+
+        var dummyColor = Arg.Any<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>();
+        _ccdProvider.GetAdvancedColorInfo(ref dummyColor).Returns(x =>
+        {
+            var info = (DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO)x[0];
+            info.value = 0x3; // Supported & Enabled
+            x[0] = info;
+            return 0;
+        });
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act (Request to Enable HDR when already enabled)
+        await service.SetHdrStateAsync("MSI4DD0", enableHdr: true);
+
+        // Assert: Neither native setter should be called (flicker-free optimization!)
+        var dummyHdr = Arg.Any<DISPLAYCONFIG_SET_HDR_STATE>();
+        _ccdProvider.DidNotReceiveWithAnyArgs().SetHdrState(ref dummyHdr);
+        var dummyAdv = Arg.Any<DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE>();
+        _ccdProvider.DidNotReceiveWithAnyArgs().SetAdvancedColorState(ref dummyAdv);
+    }
+
+    [Fact]
+    public async Task SetHdrStateAsync_ModernWin11_CallsSetHdrStateType16()
+    {
+        // Arrange (Monitor supports HDR but currently disabled)
+        SetupSingleDisplayPaths("MSI4DD0", targetId: 101);
+
+        var dummyColor = Arg.Any<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>();
+        _ccdProvider.GetAdvancedColorInfo(ref dummyColor).Returns(x =>
+        {
+            var info = (DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO)x[0];
+            info.value = 0x1; // Supported, but NOT enabled
+            x[0] = info;
+            return 0;
+        });
+
+        var dummyHdr = Arg.Any<DISPLAYCONFIG_SET_HDR_STATE>();
+        _ccdProvider.SetHdrState(ref dummyHdr).Returns(0); // Success with type 16
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act
+        await service.SetHdrStateAsync("MSI4DD0", enableHdr: true);
+
+        // Assert
+        _ccdProvider.Received(1).SetHdrState(ref Arg.Is<DISPLAYCONFIG_SET_HDR_STATE>(h => h.enableHdr && h.header.id == 101));
+        var dummyAdv = Arg.Any<DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE>();
+        _ccdProvider.DidNotReceiveWithAnyArgs().SetAdvancedColorState(ref dummyAdv);
+    }
+
+    [Fact]
+    public async Task SetHdrStateAsync_WhenType16FailsWithNotSupported_FallsBackToSetAdvancedColorStateType10()
+    {
+        // Arrange
+        SetupSingleDisplayPaths("MSI4DD0", targetId: 101);
+
+        var dummyColor = Arg.Any<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>();
+        _ccdProvider.GetAdvancedColorInfo(ref dummyColor).Returns(x =>
+        {
+            var info = (DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO)x[0];
+            info.value = 0x1; // Supported, not enabled
+            x[0] = info;
+            return 0;
+        });
+
+        // Type 16 returns ERROR_NOT_SUPPORTED (50)
+        var dummyHdr = Arg.Any<DISPLAYCONFIG_SET_HDR_STATE>();
+        _ccdProvider.SetHdrState(ref dummyHdr).Returns(50);
+
+        var dummyAdv = Arg.Any<DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE>();
+        _ccdProvider.SetAdvancedColorState(ref dummyAdv).Returns(0); // Fallback succeeds
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act
+        await service.SetHdrStateAsync("MSI4DD0", enableHdr: true);
+
+        // Assert: Fell back to type 10
+        _ccdProvider.Received(1).SetHdrState(ref Arg.Any<DISPLAYCONFIG_SET_HDR_STATE>());
+        _ccdProvider.Received(1).SetAdvancedColorState(ref Arg.Is<DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE>(a => a.enableAdvancedColor && a.header.id == 101));
+    }
+
+    [Fact]
+    public async Task SetHdrStateAsync_WhenMonitorDoesNotSupportHdr_ThrowsNotSupportedException()
+    {
+        // Arrange
+        SetupSingleDisplayPaths("MSI4DD0", targetId: 101);
+
+        var dummyColor = Arg.Any<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>();
+        _ccdProvider.GetAdvancedColorInfo(ref dummyColor).Returns(x =>
+        {
+            var info = (DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO)x[0];
+            info.value = 0x0; // Not supported
+            x[0] = info;
+            return 0;
+        });
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            service.SetHdrStateAsync("MSI4DD0", enableHdr: true));
+    }
+
+    [Fact]
+    public async Task SetHdrStateAsync_WhenMonitorNotFound_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        SetupSingleDisplayPaths("MSI4DD0", targetId: 101);
+
+        var service = new WindowsDisplayConfigurationService(_ccdProvider);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SetHdrStateAsync("NON_EXISTENT_MONITOR", enableHdr: true));
+    }
+
+    private void SetupSingleDisplayPaths(string monitorId, uint targetId)
+    {
+        var paths = new DISPLAYCONFIG_PATH_INFO[1];
+        paths[0].flags = NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE;
+        paths[0].targetInfo.adapterId = new LUID { LowPart = 1, HighPart = 0 };
+        paths[0].targetInfo.id = targetId;
+        paths[0].sourceInfo.adapterId = new LUID { LowPart = 1, HighPart = 0 };
+        paths[0].sourceInfo.id = 0;
+        paths[0].sourceInfo.modeInfoIdx = 0;
+
+        var modes = new DISPLAYCONFIG_MODE_INFO[1];
+        modes[0].infoType = DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
+        modes[0].id = 0;
+        modes[0].adapterId = new LUID { LowPart = 1, HighPart = 0 };
+        modes[0].modeInfo.sourceMode.position = new POINTL { x = 0, y = 0 };
+
+        _ccdProvider.QueryDisplayConfig(
+            QueryDisplayFlags.QDC_ALL_PATHS,
+            out Arg.Any<DISPLAYCONFIG_PATH_INFO[]>(),
+            out Arg.Any<DISPLAYCONFIG_MODE_INFO[]>())
+            .Returns(x =>
+            {
+                x[1] = paths;
+                x[2] = modes;
+                return 0;
+            });
+
+        var dummyTarget = Arg.Any<DISPLAYCONFIG_TARGET_DEVICE_NAME>();
+        _ccdProvider.GetTargetDeviceName(ref dummyTarget).Returns(x =>
+        {
+            var target = (DISPLAYCONFIG_TARGET_DEVICE_NAME)x[0];
+            target.monitorFriendlyDeviceName = "Display " + monitorId;
+            target.monitorDevicePath = $@"\\?\DISPLAY#{monitorId}#5&91ee1f9&0&UID4355#{{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}}";
+            x[0] = target;
+            return 0;
+        });
+    }
 }

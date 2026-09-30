@@ -466,4 +466,223 @@ public sealed class ProfileSwitchCoordinatorTests
         _displayService.DidNotReceiveWithAnyArgs().ApplyDisplayTopologyAsync(default!, default, default);
         _audioDirector.DidNotReceiveWithAnyArgs().SetDefaultPlaybackEndpointAsync(default!, default);
     }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_MicrophoneRouting_RoutesToPrimaryMicrophoneWhenActive()
+    {
+        // Arrange
+        const string primaryMic = "{PRIMARY-MIC-GUID}";
+        const string fallbackMic = "{FALLBACK-MIC-GUID}";
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryMicrophoneId = primaryMic;
+        _defaultSettings.DeskPresets[1].FallbackMicrophoneId = fallbackMic;
+
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new AudioEndpointInfo(DeskPrimaryAudioId, "Speakers", "Audio", DevicePresenceState.Active, true, false, AudioDeviceFlow.Playback),
+                new AudioEndpointInfo(primaryMic, "Desk Mic", "Audio", DevicePresenceState.Active, false, true, AudioDeviceFlow.Capture),
+                new AudioEndpointInfo(fallbackMic, "Webcam Mic", "Audio", DevicePresenceState.Active, false, false, AudioDeviceFlow.Capture)
+            ]);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _audioDirector.Received(1).SetDefaultCaptureEndpointAsync(primaryMic, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_MicrophoneRouting_FallsBackWhenPrimaryMicrophoneInactive()
+    {
+        // Arrange
+        const string primaryMic = "{PRIMARY-MIC-GUID}";
+        const string fallbackMic = "{FALLBACK-MIC-GUID}";
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryMicrophoneId = primaryMic;
+        _defaultSettings.DeskPresets[1].FallbackMicrophoneId = fallbackMic;
+
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new AudioEndpointInfo(DeskPrimaryAudioId, "Speakers", "Audio", DevicePresenceState.Active, true, false, AudioDeviceFlow.Playback),
+                new AudioEndpointInfo(primaryMic, "Desk Mic", "Audio", DevicePresenceState.NotPresent, false, false, AudioDeviceFlow.Capture),
+                new AudioEndpointInfo(fallbackMic, "Webcam Mic", "Audio", DevicePresenceState.Active, false, true, AudioDeviceFlow.Capture)
+            ]);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _audioDirector.Received(1).SetDefaultCaptureEndpointAsync(fallbackMic, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_MicrophoneRouting_DoesNotRouteCaptureWhenMicrophoneIdsEmpty()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryMicrophoneId = string.Empty;
+        _defaultSettings.DeskPresets[1].FallbackMicrophoneId = string.Empty;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _audioDirector.DidNotReceiveWithAnyArgs().SetDefaultCaptureEndpointAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_VolumeControl_AppliesCustomPlaybackAndMicrophoneVolume()
+    {
+        // Arrange
+        const string primaryMic = "{PRIMARY-MIC-GUID}";
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryAudioId = DeskPrimaryAudioId;
+        _defaultSettings.DeskPresets[1].PrimaryMicrophoneId = primaryMic;
+        _defaultSettings.DeskPresets[1].PlaybackVolume = new AudioVolumeSettings(PresetVolumeBehavior.Custom, 45, isMuted: false);
+        _defaultSettings.DeskPresets[1].MicrophoneVolume = new AudioVolumeSettings(PresetVolumeBehavior.Custom, 80, isMuted: true);
+
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new AudioEndpointInfo(DeskPrimaryAudioId, "Speakers", "Audio", DevicePresenceState.Active, true, false, AudioDeviceFlow.Playback),
+                new AudioEndpointInfo(primaryMic, "Desk Mic", "Audio", DevicePresenceState.Active, false, true, AudioDeviceFlow.Capture)
+            ]);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _audioDirector.Received(1).SetEndpointVolumeAsync(DeskPrimaryAudioId, 45, false, Arg.Any<CancellationToken>());
+        await _audioDirector.Received(1).SetEndpointVolumeAsync(primaryMic, 80, true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_VolumeControl_RetainsVolumeWhenModeIsRetain()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryAudioId = DeskPrimaryAudioId;
+        _defaultSettings.DeskPresets[1].PlaybackVolume = new AudioVolumeSettings(PresetVolumeBehavior.Retain, 50, isMuted: false);
+        _defaultSettings.DeskPresets[1].MicrophoneVolume = new AudioVolumeSettings(PresetVolumeBehavior.Retain, 50, isMuted: false);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _audioDirector.DidNotReceiveWithAnyArgs().SetEndpointVolumeAsync(default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_VolumeControl_FaultTolerance_ContinuesOnVolumeException()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorId = DeskMonitorId;
+        _defaultSettings.DeskPresets[1].PrimaryAudioId = DeskPrimaryAudioId;
+        _defaultSettings.DeskPresets[1].PlaybackVolume = new AudioVolumeSettings(PresetVolumeBehavior.Custom, 40, false);
+
+        _audioDirector.SetEndpointVolumeAsync(DeskPrimaryAudioId, 40, false, Arg.Any<CancellationToken>())
+            .Throws(new InvalidOperationException("COM volume endpoint unavailable"));
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result, "Profile switch should succeed even if volume adjustment encounters an error.");
+        Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_Enable_CallsSetHdrStateTrueForTargetMonitors()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId, "EXTRA_MON"];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Enable;
+
+        _displayService.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new DisplayDeviceInfo(DeskMonitorId, @"\\.\DISPLAY1", "MPG341CQPX", "GPU", true, true),
+                new DisplayDeviceInfo("EXTRA_MON", @"\\.\DISPLAY2", "Secondary", "GPU", true, false)
+            ]);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _displayService.Received(1).SetHdrStateAsync(DeskMonitorId, true, Arg.Any<CancellationToken>());
+        await _displayService.Received(1).SetHdrStateAsync("EXTRA_MON", true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_Disable_CallsSetHdrStateFalseForTargetMonitors()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Disable;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _displayService.Received(1).SetHdrStateAsync(DeskMonitorId, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_Retain_DoesNotCallSetHdrState()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Retain;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _displayService.DidNotReceiveWithAnyArgs().SetHdrStateAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_FaultTolerance_ContinuesOnHdrException()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Enable;
+
+        _displayService.SetHdrStateAsync(DeskMonitorId, true, Arg.Any<CancellationToken>())
+            .Throws(new NotSupportedException("Monitor does not support HDR"));
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result, "Profile switch should succeed even if HDR application throws an exception.");
+        Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
+    }
 }
+

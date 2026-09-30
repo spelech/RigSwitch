@@ -237,6 +237,69 @@ public interface IPolicyConfig
     int SetEndpointVisibility([MarshalAs(UnmanagedType.LPWStr)] string wszDeviceId, [MarshalAs(UnmanagedType.Bool)] bool bVisible);
 }
 
+/// <summary>
+/// CoreAudio endpoint volume COM interface.
+/// </summary>
+[ComImport]
+[Guid("5BC648DE-182D-4E46-85F0-CF0B54332D6E")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IAudioEndpointVolume
+{
+    [PreserveSig]
+    int RegisterControlChangeNotify(IntPtr pNotify);
+
+    [PreserveSig]
+    int UnregisterControlChangeNotify(IntPtr pNotify);
+
+    [PreserveSig]
+    int GetChannelCount(out uint pnChannelCount);
+
+    [PreserveSig]
+    int SetMasterVolumeLevel(float fLevelDB, ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int SetMasterVolumeLevelScalar(float fLevel, ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int GetMasterVolumeLevel(out float pfLevelDB);
+
+    [PreserveSig]
+    int GetMasterVolumeLevelScalar(out float pfLevel);
+
+    [PreserveSig]
+    int SetChannelVolumeLevel(uint nChannel, float fLevelDB, ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
+
+    [PreserveSig]
+    int GetChannelVolumeLevelScalar(uint nChannel, out float pfLevel);
+
+    [PreserveSig]
+    int SetMute([MarshalAs(UnmanagedType.Bool)] bool bMute, ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int GetMute([MarshalAs(UnmanagedType.Bool)] out bool pbMute);
+
+    [PreserveSig]
+    int GetVolumeStepInfo(out uint pnStep, out uint pnStepCount);
+
+    [PreserveSig]
+    int VolumeStepUp(ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int VolumeStepDown(ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int QueryHardwareSupport(out uint pdwHardwareSupportMask);
+
+    [PreserveSig]
+    int GetVolumeRange(out float pflVolumeMindB, out float pflVolumeMaxdB, out float pflVolumeIncrementdB);
+}
+
 [ComImport]
 [Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
 internal class MMDeviceEnumeratorComObject
@@ -254,8 +317,11 @@ internal class PolicyConfigClientComObject
 /// </summary>
 public static class ComGuids
 {
+    public const int CLSCTX_INPROC_SERVER = 0x1;
+
     public static readonly Guid ClsidMMDeviceEnumerator = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
     public static readonly Guid IidMMDeviceEnumerator = new("A95664D2-9614-4F35-A746-DE8DB63617E6");
     public static readonly Guid ClsidPolicyConfigClient = new("870af99c-171d-4f9e-af0d-e63df40c2bc9");
     public static readonly Guid IidPolicyConfig = new("f8679f50-850a-41cf-9c72-430f290290c8");
+    public static readonly Guid IidIAudioEndpointVolume = new("5BC648DE-182D-4E46-85F0-CF0B54332D6E");
 }

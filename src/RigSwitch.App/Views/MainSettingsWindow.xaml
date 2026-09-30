@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:RigSwitch.App.ViewModels"
         xmlns:ctrl="clr-namespace:RigSwitch.App.Controls"
+        xmlns:enums="clr-namespace:RigSwitch.Core.Enums;assembly=RigSwitch.Core"
         mc:Ignorable="d"
         Title="RigSwitch — Workstation &amp; Sim Rig Hardware Controller"
         Width="780"
@@ -19,6 +20,7 @@
         d:DataContext="{d:DesignInstance Type=vm:MainSettingsViewModel}">
 
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <!-- Pure Pitch-Black OLED & High-Contrast Telemetry Palette -->
         <SolidColorBrush x:Key="OledBaseBg" Color="#000000" />
         <SolidColorBrush x:Key="OledControlBg" Color="#08080C" />
@@ -297,6 +299,10 @@
                                    TextAlignment="Center"
                                    Visibility="Collapsed"
                                    Margin="0,2,0,0" />
+                        <Border Background="#121224" BorderBrush="#00E5FF" BorderThickness="1" CornerRadius="3" Padding="5,1" Margin="0,3,0,0" HorizontalAlignment="Center"
+                                Visibility="{Binding HasHdrBadge, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding HdrBadgeText}" FontSize="9" FontWeight="Bold" Foreground="#00E5FF" />
+                        </Border>
                     </StackPanel>
 
                     <!-- Pile Action Buttons -->
@@ -415,6 +421,22 @@
                             FontSize="12" />
                 </Grid>
 
+                <!-- Native Windows HDR (Advanced Color) -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Windows HDR (Color):" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              SelectedValue="{Binding HdrMode, Mode=TwoWay}"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Retain Current Windows HDR State" Tag="{x:Static enums:PresetHdrMode.Retain}" />
+                        <ComboBoxItem Content="Enable HDR (Advanced Color)" Tag="{x:Static enums:PresetHdrMode.Enable}" />
+                        <ComboBoxItem Content="Disable HDR (SDR Standard)" Tag="{x:Static enums:PresetHdrMode.Disable}" />
+                    </ComboBox>
+                </Grid>
+
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="180" />
@@ -439,6 +461,105 @@
                               SelectedValue="{Binding FallbackAudioId, Mode=TwoWay}"
                               SelectedValuePath="Id"
                               DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <!-- Playback Volume Settings -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Playback Volume:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ComboBox SelectedValue="{Binding PlaybackVolumeMode, Mode=TwoWay}"
+                                  SelectedValuePath="Tag"
+                                  Margin="0,0,0,6">
+                            <ComboBoxItem Content="Retain System Volume" Tag="{x:Static enums:PresetVolumeBehavior.Retain}" />
+                            <ComboBoxItem Content="Custom Volume Level" Tag="{x:Static enums:PresetVolumeBehavior.Custom}" />
+                        </ComboBox>
+                        <Grid Grid.Row="1" Visibility="{Binding IsCustomPlaybackVolume, Converter={StaticResource BoolToVis}}" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Value="{Binding PlaybackVolumePercent, Mode=TwoWay}"
+                                    Minimum="0" Maximum="100" SmallChange="1" LargeChange="5"
+                                    VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Text="{Binding PlaybackVolumePercent, StringFormat='{}{0}%'}"
+                                       VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
+                            <CheckBox Grid.Column="2" Content="Mute"
+                                      IsChecked="{Binding PlaybackVolumeIsMuted, Mode=TwoWay}"
+                                      VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <!-- Microphone Routing -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Primary Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding PrimaryMicrophoneId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Fallback Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding FallbackMicrophoneId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <!-- Microphone Volume Settings -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Microphone Volume:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ComboBox SelectedValue="{Binding MicrophoneVolumeMode, Mode=TwoWay}"
+                                  SelectedValuePath="Tag"
+                                  Margin="0,0,0,6">
+                            <ComboBoxItem Content="Retain System Volume" Tag="{x:Static enums:PresetVolumeBehavior.Retain}" />
+                            <ComboBoxItem Content="Custom Input Level" Tag="{x:Static enums:PresetVolumeBehavior.Custom}" />
+                        </ComboBox>
+                        <Grid Grid.Row="1" Visibility="{Binding IsCustomMicrophoneVolume, Converter={StaticResource BoolToVis}}" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Value="{Binding MicrophoneVolumePercent, Mode=TwoWay}"
+                                    Minimum="0" Maximum="100" SmallChange="1" LargeChange="5"
+                                    VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Text="{Binding MicrophoneVolumePercent, StringFormat='{}{0}%'}"
+                                       VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
+                            <CheckBox Grid.Column="2" Content="Mute"
+                                      IsChecked="{Binding MicrophoneVolumeIsMuted, Mode=TwoWay}"
+                                      VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </Grid>
+                    </Grid>
                 </Grid>
 
                 <Grid Margin="0,0,0,12">

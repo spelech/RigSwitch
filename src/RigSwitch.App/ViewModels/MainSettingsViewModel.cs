@@ -49,6 +49,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<AudioEndpointInfo> DetectedAudioEndpoints { get; } = [];
     public ObservableCollection<DeviceSelectionOption> AvailableDisplayOptions { get; } = [];
     public ObservableCollection<DeviceSelectionOption> AvailableAudioOptions { get; } = [];
+    public ObservableCollection<DeviceSelectionOption> AvailableMicrophoneOptions { get; } = [];
     public ObservableCollection<DeviceNicknameItemViewModel> DeviceNicknames { get; } = [];
     public ObservableCollection<AudioEndpointVisibilityItemViewModel> AudioEndpointsVisibility { get; } = [];
     public System.ComponentModel.ICollectionView? FilteredAudioEndpoints { get; private set; }
@@ -235,11 +236,20 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             AvailableAudioOptions.Clear();
             AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
-            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active))
+            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Playback))
             {
                 string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
                 var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
                 AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
+            }
+
+            AvailableMicrophoneOptions.Clear();
+            AvailableMicrophoneOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Microphone (Unassigned / System Default) —"));
+            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Capture))
+            {
+                string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
+                var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+                AvailableMicrophoneOptions.Add(new DeviceSelectionOption(a.Id, name));
             }
 
             DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
@@ -256,6 +266,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.PrimaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.FallbackMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 DeskPresets.Add(new PresetConfigurationItemViewModel(preset, i, "DeskActivePreset", i == _settings.ActiveDeskPresetIndex, OnDeskPresetActivated));
             }
 
@@ -266,6 +278,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.PrimaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.FallbackMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 RigPresets.Add(new PresetConfigurationItemViewModel(preset, i, "RigActivePreset", i == _settings.ActiveRigPresetIndex, OnRigPresetActivated));
             }
 
@@ -278,7 +292,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             }
             foreach (var a in audioEndpoints)
             {
-                DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, "Audio Playback", a.Name, _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty)));
+                string kind = a.Flow == AudioDeviceFlow.Capture ? "Microphone / Input" : "Audio Playback";
+                DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, kind, a.Name, _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty)));
                 seenNicknameIds.Add(a.Id);
             }
             foreach (var (id, cachedName) in _settings.CachedDeviceNames)
