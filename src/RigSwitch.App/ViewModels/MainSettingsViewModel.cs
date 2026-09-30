@@ -368,7 +368,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
     public async Task CheckForUpdatesAutoAsync()
     {
-        if (_settings == null || !_settings.EnableAutoUpdateCheck) return;
+        _settings ??= await _settingsStorage.LoadSettingsAsync();
+        if (!_settings.EnableAutoUpdateCheck) return;
         if (_settings.UpdateCheckSkippedUntil.HasValue && DateTime.UtcNow < _settings.UpdateCheckSkippedUntil.Value) return;
 
         await CheckForUpdatesInternalAsync(isManual: false);
@@ -380,10 +381,10 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         StatusMessage = "Checking for application updates...";
         try
         {
-            var settings = _settings ?? await _settingsStorage.LoadSettingsAsync();
+            _settings ??= await _settingsStorage.LoadSettingsAsync();
             var resultMsg = await UpdateCheckHandler.CheckForUpdatesAsync(
                 _updateCheckService,
-                settings,
+                _settings,
                 _settingsStorage,
                 isManual,
                 tag => IgnoredReleaseVersion = tag);
@@ -402,11 +403,11 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
     public async Task HandleUpdateUserChoiceAsync(UpdateUserChoice choice, UpdateInfo updateInfo)
     {
-        var settings = _settings ?? await _settingsStorage.LoadSettingsAsync();
+        _settings ??= await _settingsStorage.LoadSettingsAsync();
         var resultMsg = await UpdateCheckHandler.HandleUserChoiceAsync(
             choice,
             updateInfo,
-            settings,
+            _settings,
             _settingsStorage,
             tag => IgnoredReleaseVersion = tag);
 

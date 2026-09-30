@@ -148,16 +148,77 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
 
     /// <summary>
     /// Compares two version strings to determine if latestVersion is strictly newer than currentVersion.
+    /// Handles differing component counts (e.g. 1.0.0 vs 1.0.0.0) and SemVer suffixes.
     /// </summary>
     public static bool IsVersionNewer(string latestVersion, string currentVersion)
     {
-        if (Version.TryParse(NormalizeVersionString(latestVersion), out var latest) &&
-            Version.TryParse(NormalizeVersionString(currentVersion), out var current))
+        if (string.IsNullOrWhiteSpace(latestVersion) || string.IsNullOrWhiteSpace(currentVersion))
         {
-            return latest > current;
+            return false;
         }
 
-        return string.Compare(latestVersion, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
+        var latestNorm = NormalizeVersionString(latestVersion);
+        var currentNorm = NormalizeVersionString(currentVersion);
+
+        if (TryExtractVersionNumbers(latestNorm, out var latestParts) &&
+            TryExtractVersionNumbers(currentNorm, out var currentParts))
+        {
+            int maxLen = Math.Max(latestParts.Length, currentParts.Length);
+            for (int i = 0; i < maxLen; i++)
+            {
+                int l = i < latestParts.Length ? latestParts[i] : 0;
+                int c = i < currentParts.Length ? currentParts[i] : 0;
+                if (l != c)
+                {
+                    return l > c;
+                }
+            }
+
+            bool latestHasPre = latestNorm.Contains('-');
+            bool currentHasPre = currentNorm.Contains('-');
+            if (!latestHasPre && currentHasPre)
+            {
+                return true;
+            }
+
+            if (latestHasPre && !currentHasPre)
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        return string.Compare(latestNorm, currentNorm, StringComparison.OrdinalIgnoreCase) > 0;
+    }
+
+    private static bool TryExtractVersionNumbers(string versionString, out int[] numbers)
+    {
+        int separatorIdx = versionString.IndexOfAny(['-', '+']);
+        string core = separatorIdx >= 0 ? versionString[..separatorIdx] : versionString;
+
+        string[] parts = core.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var list = new List<int>();
+        foreach (var p in parts)
+        {
+            if (int.TryParse(p, out int val) && val >= 0)
+            {
+                list.Add(val);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (list.Count > 0)
+        {
+            numbers = list.ToArray();
+            return true;
+        }
+
+        numbers = [];
+        return false;
     }
 
     /// <inheritdoc/>

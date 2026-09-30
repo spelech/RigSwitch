@@ -32,6 +32,13 @@ public class UpdateCheckServiceTests
     [InlineData("1.0.0", "1.0.0", false)]
     [InlineData("0.9.0", "1.0.0", false)]
     [InlineData("1.0.1-beta", "1.0.0", true)]
+    [InlineData("1.0.0.0", "1.0.0", false)]
+    [InlineData("1.0.0", "1.0.0.0", false)]
+    [InlineData("1.1.0", "1.0.0.0", true)]
+    [InlineData("1.0.0", "1.0.0-beta", true)]
+    [InlineData("1.0.0-beta", "1.0.0", false)]
+    [InlineData("v1.2.0-beta", "v1.10.0", false)]
+    [InlineData("v1.10.0", "v1.2.0", true)]
     public void IsVersionNewer_CorrectlyComparesVersions(string latest, string current, bool expected)
     {
         bool result = UpdateCheckService.IsVersionNewer(latest, current);
@@ -202,6 +209,40 @@ public class UpdateCheckServiceTests
         await vm.CheckForUpdatesAutoAsync();
 
         await mockCheckService.DidNotReceive().CheckForUpdatesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task MainSettingsViewModel_CheckForUpdatesAutoAsync_WhenSettingsNotLoadedYet_LoadsSettingsAndChecksForUpdates()
+    {
+        var mockCheckService = Substitute.For<IUpdateCheckService>();
+        mockCheckService.CheckForUpdatesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new UpdateInfo(false, "1.0.0", "1.0.0", "", "", ""));
+
+        var settingsStorage = Substitute.For<ISettingsStorageService>();
+        var settings = new UserSettings
+        {
+            EnableAutoUpdateCheck = true,
+            IgnoredReleaseVersion = "1.2.0"
+        };
+        settingsStorage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        var coordinator = Substitute.For<IProfileSwitchCoordinator>();
+        var trayService = new TrayIconService(coordinator, settingsStorage);
+
+        using var vm = new MainSettingsViewModel(
+            coordinator,
+            settingsStorage,
+            Substitute.For<IDisplayConfigurationService>(),
+            Substitute.For<IAudioEndpointDirector>(),
+            Substitute.For<IGlobalHotkeyService>(),
+            trayService,
+            mockCheckService);
+
+        // Intentionally do NOT call vm.LoadAsync() - simulate App.xaml.cs startup check
+        await vm.CheckForUpdatesAutoAsync();
+
+        await settingsStorage.Received(1).LoadSettingsAsync(Arg.Any<CancellationToken>());
+        await mockCheckService.Received(1).CheckForUpdatesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     private sealed class MockHttpMessageHandler : HttpMessageHandler

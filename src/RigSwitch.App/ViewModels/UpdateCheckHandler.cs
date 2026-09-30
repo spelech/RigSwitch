@@ -49,10 +49,17 @@ public static class UpdateCheckHandler
 
         void ShowDialogOnUiThread()
         {
-            var window = new UpdateNotificationWindow(updateInfo)
+            var window = new UpdateNotificationWindow(updateInfo);
+            var mainWindow = Application.Current?.MainWindow;
+            if (mainWindow != null && mainWindow.IsVisible)
             {
-                Owner = Application.Current?.MainWindow
-            };
+                window.Owner = mainWindow;
+            }
+            else
+            {
+                window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
+
             dialogResult = window.ShowDialog();
             choice = window.Choice;
         }
@@ -94,15 +101,21 @@ public static class UpdateCheckHandler
                 string targetUrl = !string.IsNullOrWhiteSpace(updateInfo.DownloadUrl) ? updateInfo.DownloadUrl : updateInfo.HtmlUrl;
                 if (!string.IsNullOrWhiteSpace(targetUrl))
                 {
-                    try
+                    if (Uri.TryCreate(targetUrl, UriKind.Absolute, out var uri) &&
+                        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                     {
-                        Process.Start(new ProcessStartInfo { FileName = targetUrl, UseShellExecute = true });
-                        return "Opened release download page in browser.";
+                        try
+                        {
+                            Process.Start(new ProcessStartInfo { FileName = uri.AbsoluteUri, UseShellExecute = true });
+                            return "Opened release download page in browser.";
+                        }
+                        catch (Exception ex)
+                        {
+                            return $"Failed to open browser: {ex.Message}";
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        return $"Failed to open browser: {ex.Message}";
-                    }
+
+                    return "Invalid download URL provided.";
                 }
                 break;
 
