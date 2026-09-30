@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows.Input;
 using Microsoft.Win32;
+using RigSwitch.Core.Enums;
 using RigSwitch.Core.Models;
 
 /// <summary>
@@ -17,6 +18,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     private List<string> _targetMonitorIds = [];
     private string _primaryAudioId;
     private string _fallbackAudioId;
+    private string _primaryMicrophoneId = string.Empty;
+    private string _fallbackMicrophoneId = string.Empty;
+    private PresetVolumeBehavior _playbackVolumeMode = PresetVolumeBehavior.Retain;
+    private int _playbackVolumePercent = 50;
+    private bool _playbackVolumeIsMuted;
+    private PresetVolumeBehavior _microphoneVolumeMode = PresetVolumeBehavior.Retain;
+    private int _microphoneVolumePercent = 50;
+    private bool _microphoneVolumeIsMuted;
+    private PresetHdrMode _hdrMode = PresetHdrMode.Retain;
     private string _directHotkey;
     private bool _isActive;
 
@@ -115,6 +125,109 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets or sets the primary microphone / capture endpoint GUID identifier.
+    /// </summary>
+    public string PrimaryMicrophoneId
+    {
+        get => _primaryMicrophoneId;
+        set => SetProperty(ref _primaryMicrophoneId, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the fallback microphone / capture endpoint GUID identifier.
+    /// </summary>
+    public string FallbackMicrophoneId
+    {
+        get => _fallbackMicrophoneId;
+        set => SetProperty(ref _fallbackMicrophoneId, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the playback volume behavior mode (Retain or Custom).
+    /// </summary>
+    public PresetVolumeBehavior PlaybackVolumeMode
+    {
+        get => _playbackVolumeMode;
+        set
+        {
+            if (SetProperty(ref _playbackVolumeMode, value))
+            {
+                OnPropertyChanged(nameof(IsCustomPlaybackVolume));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether custom playback volume adjustment is enabled.
+    /// </summary>
+    public bool IsCustomPlaybackVolume => PlaybackVolumeMode == PresetVolumeBehavior.Custom;
+
+    /// <summary>
+    /// Gets or sets the target playback volume percent [0, 100].
+    /// </summary>
+    public int PlaybackVolumePercent
+    {
+        get => _playbackVolumePercent;
+        set => SetProperty(ref _playbackVolumePercent, Math.Clamp(value, 0, 100));
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether playback should be muted.
+    /// </summary>
+    public bool PlaybackVolumeIsMuted
+    {
+        get => _playbackVolumeIsMuted;
+        set => SetProperty(ref _playbackVolumeIsMuted, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the microphone input volume behavior mode (Retain or Custom).
+    /// </summary>
+    public PresetVolumeBehavior MicrophoneVolumeMode
+    {
+        get => _microphoneVolumeMode;
+        set
+        {
+            if (SetProperty(ref _microphoneVolumeMode, value))
+            {
+                OnPropertyChanged(nameof(IsCustomMicrophoneVolume));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether custom microphone volume adjustment is enabled.
+    /// </summary>
+    public bool IsCustomMicrophoneVolume => MicrophoneVolumeMode == PresetVolumeBehavior.Custom;
+
+    /// <summary>
+    /// Gets or sets the target microphone input volume percent [0, 100].
+    /// </summary>
+    public int MicrophoneVolumePercent
+    {
+        get => _microphoneVolumePercent;
+        set => SetProperty(ref _microphoneVolumePercent, Math.Clamp(value, 0, 100));
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether microphone input should be muted.
+    /// </summary>
+    public bool MicrophoneVolumeIsMuted
+    {
+        get => _microphoneVolumeIsMuted;
+        set => SetProperty(ref _microphoneVolumeIsMuted, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the native Windows HDR switching mode for this preset.
+    /// </summary>
+    public PresetHdrMode HdrMode
+    {
+        get => _hdrMode;
+        set => SetProperty(ref _hdrMode, value);
+    }
+
+    /// <summary>
     /// Gets or sets the direct hotkey combination used to activate this preset.
     /// </summary>
     public string DirectHotkey
@@ -182,6 +295,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         _targetMonitorId = preset.TargetMonitorId;
         _primaryAudioId = preset.PrimaryAudioId;
         _fallbackAudioId = preset.FallbackAudioId;
+        _primaryMicrophoneId = preset.PrimaryMicrophoneId ?? string.Empty;
+        _fallbackMicrophoneId = preset.FallbackMicrophoneId ?? string.Empty;
+        _playbackVolumeMode = preset.PlaybackVolume?.Mode ?? PresetVolumeBehavior.Retain;
+        _playbackVolumePercent = preset.PlaybackVolume?.VolumePercent ?? 50;
+        _playbackVolumeIsMuted = preset.PlaybackVolume?.IsMuted ?? false;
+        _microphoneVolumeMode = preset.MicrophoneVolume?.Mode ?? PresetVolumeBehavior.Retain;
+        _microphoneVolumePercent = preset.MicrophoneVolume?.VolumePercent ?? 50;
+        _microphoneVolumeIsMuted = preset.MicrophoneVolume?.IsMuted ?? false;
+        _hdrMode = preset.HdrMode;
         _directHotkey = preset.DirectHotkey;
 
         if (preset.ApplicationHooks != null)
@@ -237,6 +359,11 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         target.TargetMonitorId = TargetMonitorId;
         target.PrimaryAudioId = PrimaryAudioId;
         target.FallbackAudioId = FallbackAudioId;
+        target.PrimaryMicrophoneId = PrimaryMicrophoneId;
+        target.FallbackMicrophoneId = FallbackMicrophoneId;
+        target.PlaybackVolume = new AudioVolumeSettings(PlaybackVolumeMode, PlaybackVolumePercent, PlaybackVolumeIsMuted);
+        target.MicrophoneVolume = new AudioVolumeSettings(MicrophoneVolumeMode, MicrophoneVolumePercent, MicrophoneVolumeIsMuted);
+        target.HdrMode = HdrMode;
         target.DirectHotkey = DirectHotkey;
         target.ApplicationHooks = ApplicationHooks.Select(h => h.ToModel()).ToList();
     }

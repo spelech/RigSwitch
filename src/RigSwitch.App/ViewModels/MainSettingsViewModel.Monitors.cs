@@ -98,6 +98,8 @@ public partial class MainSettingsViewModel
                 pile: pile,
                 isPrimary: display.IsPrimary,
                 isActive: display.IsActive,
+                supportsHdr: display.SupportsHdr,
+                isHdrEnabled: display.IsHdrEnabled,
                 movePileAction: OnTilePileMoved);
 
             MonitorTiles.Add(tile);

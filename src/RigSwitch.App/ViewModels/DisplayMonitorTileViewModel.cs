@@ -22,6 +22,8 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
     private MonitorPileAssignment _pile;
     private bool _isPrimary;
     private bool _isActive;
+    private readonly bool _supportsHdr;
+    private readonly bool _isHdrEnabled;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DisplayMonitorTileViewModel"/> class.
@@ -33,6 +35,8 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
         MonitorPileAssignment pile,
         bool isPrimary = false,
         bool isActive = true,
+        bool supportsHdr = false,
+        bool isHdrEnabled = false,
         Action<DisplayMonitorTileViewModel, MonitorPileAssignment>? movePileAction = null)
     {
         _displayNumber = displayNumber;
@@ -41,6 +45,8 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
         _pile = pile;
         _isPrimary = isPrimary;
         _isActive = isActive;
+        _supportsHdr = supportsHdr;
+        _isHdrEnabled = isHdrEnabled;
 
         MoveToUnassignedCommand = new RelayCommand(() => movePileAction?.Invoke(this, MonitorPileAssignment.Unassigned));
         MoveToDeskCommand = new RelayCommand(() => movePileAction?.Invoke(this, MonitorPileAssignment.Desk));
@@ -105,6 +111,26 @@ public sealed class DisplayMonitorTileViewModel : ViewModelBase
     public bool IsUnassigned => Pile == MonitorPileAssignment.Unassigned;
     public bool IsDesk => Pile == MonitorPileAssignment.Desk;
     public bool IsRig => Pile == MonitorPileAssignment.SimRig;
+
+    /// <summary>
+    /// Gets a value indicating whether this display hardware supports HDR.
+    /// </summary>
+    public bool SupportsHdr => _supportsHdr;
+
+    /// <summary>
+    /// Gets a value indicating whether HDR is currently enabled on this display.
+    /// </summary>
+    public bool IsHdrEnabled => _isHdrEnabled;
+
+    /// <summary>
+    /// Gets the badge text describing HDR status.
+    /// </summary>
+    public string HdrBadgeText => IsHdrEnabled ? "HDR ON" : (SupportsHdr ? "HDR" : string.Empty);
+
+    /// <summary>
+    /// Gets a value indicating whether this tile has HDR capabilities to badge.
+    /// </summary>
+    public bool HasHdrBadge => SupportsHdr;
 
     public string PileBadgeText => Pile switch
     {
