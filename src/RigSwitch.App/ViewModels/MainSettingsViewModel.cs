@@ -1,16 +1,19 @@
 namespace RigSwitch.App.ViewModels;
 
 using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using RigSwitch.App.Services;
+using RigSwitch.App.Views;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Events;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Models;
+using RigSwitch.Infrastructure.Services;
 
 /// <summary>
-/// Primary view model orchestrating hardware profiles, device renaming, audio visibility, and system preferences.
+/// Primary view model orchestrating hardware profiles, device renaming, audio visibility, update checks, and preferences.
 /// </summary>
 public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 {
@@ -20,6 +23,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     private readonly IAudioEndpointDirector _audioDirector;
     private readonly IGlobalHotkeyService _hotkeyService;
     private readonly TrayIconService _trayIconService;
+    private readonly IUpdateCheckService _updateCheckService;
 
     private UserSettings? _settings;
     private ProfileMode _currentProfile;
@@ -37,6 +41,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     private string _rigHotkey = "Ctrl+Alt+R";
     private bool _startMinimizedToTray = true;
     private bool _showToastNotifications = true;
+    private bool _enableAutoUpdateCheck = true;
+    private string _ignoredReleaseVersion = string.Empty;
     private bool _disposed;
 
     public ObservableCollection<DisplayDeviceInfo> DetectedDisplays { get; } = [];
@@ -51,13 +57,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public string AudioSearchText
     {
         get => _audioSearchText;
-        set
-        {
-            if (SetProperty(ref _audioSearchText, value))
-            {
-                FilteredAudioEndpoints?.Refresh();
-            }
-        }
+        set { if (SetProperty(ref _audioSearchText, value)) FilteredAudioEndpoints?.Refresh(); }
     }
 
     private string _audioFilterSelection = "All";
@@ -84,30 +84,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public ICommand SelectActiveAudioFilterCommand { get; }
     public ICommand SelectInactiveAudioFilterCommand { get; }
 
-    public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection)
-    {
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            bool nameMatch = item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase);
-            bool adapterMatch = item.Adapter.Contains(searchText, StringComparison.OrdinalIgnoreCase);
-            if (!nameMatch && !adapterMatch)
-            {
-                return false;
-            }
-        }
-
-        if (string.Equals(filterSelection, "Active", StringComparison.OrdinalIgnoreCase))
-        {
-            return item.State == RigSwitch.Core.Enums.DevicePresenceState.Active;
-        }
-
-        if (string.Equals(filterSelection, "Inactive", StringComparison.OrdinalIgnoreCase))
-        {
-            return item.State != RigSwitch.Core.Enums.DevicePresenceState.Active;
-        }
-
-        return true;
-    }
+    public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection) => DeviceOptionResolver.MatchesAudioFilter(item, searchText, filterSelection);
 
     public ObservableCollection<PresetConfigurationItemViewModel> DeskPresets { get; } = [];
     public ObservableCollection<PresetConfigurationItemViewModel> RigPresets { get; } = [];
@@ -145,11 +122,14 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
     public bool StartMinimizedToTray { get => _startMinimizedToTray; set => SetProperty(ref _startMinimizedToTray, value); }
     public bool ShowToastNotifications { get => _showToastNotifications; set => SetProperty(ref _showToastNotifications, value); }
+    public bool EnableAutoUpdateCheck { get => _enableAutoUpdateCheck; set => SetProperty(ref _enableAutoUpdateCheck, value); }
+    public string IgnoredReleaseVersion { get => _ignoredReleaseVersion; set => SetProperty(ref _ignoredReleaseVersion, value); }
 
     public ICommand SwitchToDeskCommand { get; }
     public ICommand SwitchToRigCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand RefreshDevicesCommand { get; }
+    public ICommand CheckForUpdatesCommand { get; }
 
     public MainSettingsViewModel(
         IProfileSwitchCoordinator coordinator,
@@ -157,7 +137,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         IDisplayConfigurationService displayService,
         IAudioEndpointDirector audioDirector,
         IGlobalHotkeyService hotkeyService,
-        TrayIconService trayIconService)
+        TrayIconService trayIconService,
+        IUpdateCheckService? updateCheckService = null)
     {
         ArgumentNullException.ThrowIfNull(coordinator);
         ArgumentNullException.ThrowIfNull(settingsStorage);
@@ -172,6 +153,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         _audioDirector = audioDirector;
         _hotkeyService = hotkeyService;
         _trayIconService = trayIconService;
+        _updateCheckService = updateCheckService ?? new UpdateCheckService();
 
         _currentProfile = _coordinator.CurrentProfile;
         _coordinator.ProfileChanged += OnProfileChanged;
@@ -180,22 +162,16 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         SwitchToRigCommand = new AsyncRelayCommand(() => SwitchProfileAsync(ProfileMode.SimRig), () => !IsBusy);
         SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync, () => !IsBusy);
         RefreshDevicesCommand = new AsyncRelayCommand(() => LoadAsync(), () => !IsBusy);
+        CheckForUpdatesCommand = new AsyncRelayCommand(() => CheckForUpdatesManualAsync(), () => !IsBusy);
 
         SelectAllAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "All");
         SelectActiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Active");
         SelectInactiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Inactive");
 
-        FilteredAudioEndpoints = System.Windows.Data.CollectionViewSource.GetDefaultView(AudioEndpointsVisibility);
+        FilteredAudioEndpoints = CollectionViewSource.GetDefaultView(AudioEndpointsVisibility);
         if (FilteredAudioEndpoints != null)
         {
-            FilteredAudioEndpoints.Filter = item =>
-            {
-                if (item is AudioEndpointVisibilityItemViewModel endpoint)
-                {
-                    return MatchesAudioFilter(endpoint, AudioSearchText, AudioFilterSelection);
-                }
-                return true;
-            };
+            FilteredAudioEndpoints.Filter = item => item is AudioEndpointVisibilityItemViewModel endpoint && MatchesAudioFilter(endpoint, AudioSearchText, AudioFilterSelection);
         }
     }
 
@@ -205,7 +181,6 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         try
         {
             _settings = await _settingsStorage.LoadSettingsAsync(cancellationToken);
-
             CurrentProfile = _coordinator.CurrentProfile;
 
             DeskMonitorId = _settings.DeskMonitorId;
@@ -220,35 +195,29 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             StartMinimizedToTray = _settings.StartMinimizedToTray;
             ShowToastNotifications = _settings.ShowToastNotifications;
+            EnableAutoUpdateCheck = _settings.EnableAutoUpdateCheck;
+            IgnoredReleaseVersion = _settings.IgnoredReleaseVersion;
 
             var displays = await _displayService.EnumerateDisplaysAsync(cancellationToken);
             DetectedDisplays.Clear();
-            foreach (var d in displays)
-            {
-                DetectedDisplays.Add(d);
-            }
+            foreach (var d in displays) DetectedDisplays.Add(d);
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
             DetectedAudioEndpoints.Clear();
-            foreach (var a in audioEndpoints.Where(x => x.State == RigSwitch.Core.Enums.DevicePresenceState.Active))
-            {
-                DetectedAudioEndpoints.Add(a);
-            }
+            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active)) DetectedAudioEndpoints.Add(a);
 
             AvailableDisplayOptions.Clear();
             AvailableDisplayOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Display (Unassigned) —"));
             foreach (var d in displays)
             {
                 var stateTag = d.IsPrimary ? " (Primary)" : (d.IsActive ? " (Active)" : "");
-                var label = string.IsNullOrWhiteSpace(d.FriendlyName)
-                    ? d.MonitorId
-                    : $"{d.FriendlyName} [{d.MonitorId}]{stateTag}";
+                var label = string.IsNullOrWhiteSpace(d.FriendlyName) ? d.MonitorId : $"{d.FriendlyName} [{d.MonitorId}]{stateTag}";
                 AvailableDisplayOptions.Add(new DeviceSelectionOption(d.MonitorId, label));
             }
 
             AvailableAudioOptions.Clear();
             AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
-            foreach (var a in audioEndpoints.Where(x => x.State == RigSwitch.Core.Enums.DevicePresenceState.Active))
+            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active))
             {
                 string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
                 var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
@@ -269,14 +238,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions);
                 preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions);
                 preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions);
-
-                bool isActive = i == _settings.ActiveDeskPresetIndex;
-                DeskPresets.Add(new PresetConfigurationItemViewModel(
-                    preset,
-                    i,
-                    "DeskActivePreset",
-                    isActive,
-                    OnDeskPresetActivated));
+                DeskPresets.Add(new PresetConfigurationItemViewModel(preset, i, "DeskActivePreset", i == _settings.ActiveDeskPresetIndex, OnDeskPresetActivated));
             }
 
             RigPresets.Clear();
@@ -286,40 +248,21 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions);
                 preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions);
                 preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions);
-
-                bool isActive = i == _settings.ActiveRigPresetIndex;
-                RigPresets.Add(new PresetConfigurationItemViewModel(
-                    preset,
-                    i,
-                    "RigActivePreset",
-                    isActive,
-                    OnRigPresetActivated));
+                RigPresets.Add(new PresetConfigurationItemViewModel(preset, i, "RigActivePreset", i == _settings.ActiveRigPresetIndex, OnRigPresetActivated));
             }
 
             DeviceNicknames.Clear();
             foreach (var d in displays)
-            {
-                string nick = _settings.CustomDeviceNames.GetValueOrDefault(d.MonitorId, string.Empty);
-                DeviceNicknames.Add(new DeviceNicknameItemViewModel(d.MonitorId, "Display", d.FriendlyName, nick));
-            }
+                DeviceNicknames.Add(new DeviceNicknameItemViewModel(d.MonitorId, "Display", d.FriendlyName, _settings.CustomDeviceNames.GetValueOrDefault(d.MonitorId, string.Empty)));
             foreach (var a in audioEndpoints)
-            {
-                string nick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
-                DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, "Audio Playback", a.Name, nick));
-            }
+                DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, "Audio Playback", a.Name, _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty)));
 
             AudioEndpointsVisibility.Clear();
             var hiddenList = _settings.HiddenAudioEndpointIds;
             foreach (var a in audioEndpoints)
             {
                 bool isVisible = !hiddenList.Any(hId => DeviceOptionResolver.MatchesEndpoint(hId, a.Id));
-                AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(
-                    a.Id,
-                    a.Name,
-                    a.AdapterDescription,
-                    isVisible,
-                    OnAudioVisibilityChangedAsync,
-                    a.State));
+                AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(a.Id, a.Name, a.AdapterDescription, isVisible, OnAudioVisibilityChangedAsync, a.State));
             }
 
             StatusMessage = "Devices and configuration loaded.";
@@ -341,9 +284,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         try
         {
             bool success = await _coordinator.SwitchProfileAsync(targetProfile);
-            StatusMessage = success
-                ? $"Successfully switched to {targetProfile} profile."
-                : $"Failed to switch to {targetProfile} profile.";
+            StatusMessage = success ? $"Successfully switched to {targetProfile} profile." : $"Failed to switch to {targetProfile} profile.";
         }
         catch (Exception ex)
         {
@@ -362,25 +303,13 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         {
             var settings = _settings ?? new UserSettings();
 
-            // Update Desk Presets
             for (int i = 0; i < DeskPresets.Count; i++)
-            {
-                if (i < settings.DeskPresets.Count)
-                {
-                    DeskPresets[i].ApplyTo(settings.DeskPresets[i]);
-                }
-            }
+                if (i < settings.DeskPresets.Count) DeskPresets[i].ApplyTo(settings.DeskPresets[i]);
             var activeDeskIdx = DeskPresets.TakeWhile(p => !p.IsActive).Count();
             settings.ActiveDeskPresetIndex = activeDeskIdx < DeskPresets.Count ? activeDeskIdx : 0;
 
-            // Update Rig Presets
             for (int i = 0; i < RigPresets.Count; i++)
-            {
-                if (i < settings.RigPresets.Count)
-                {
-                    RigPresets[i].ApplyTo(settings.RigPresets[i]);
-                }
-            }
+                if (i < settings.RigPresets.Count) RigPresets[i].ApplyTo(settings.RigPresets[i]);
             var activeRigIdx = RigPresets.TakeWhile(p => !p.IsActive).Count();
             settings.ActiveRigPresetIndex = activeRigIdx < RigPresets.Count ? activeRigIdx : 0;
 
@@ -402,17 +331,15 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             settings.StartMinimizedToTray = StartMinimizedToTray;
             settings.ShowToastNotifications = ShowToastNotifications;
+            settings.EnableAutoUpdateCheck = EnableAutoUpdateCheck;
+            settings.IgnoredReleaseVersion = IgnoredReleaseVersion;
 
             foreach (var nickItem in DeviceNicknames)
             {
                 if (!string.IsNullOrWhiteSpace(nickItem.CustomNickname))
-                {
                     settings.CustomDeviceNames[nickItem.DeviceId] = nickItem.CustomNickname.Trim();
-                }
                 else
-                {
                     settings.CustomDeviceNames.Remove(nickItem.DeviceId);
-                }
             }
 
             await _settingsStorage.SaveSettingsAsync(settings);
@@ -423,9 +350,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             _trayIconService.RefreshPresets(settings);
 
             if (string.IsNullOrEmpty(StatusMessage) || !StatusMessage.StartsWith("Warning:", StringComparison.Ordinal))
-            {
                 StatusMessage = "Settings saved successfully!";
-            }
 
             _trayIconService.ShowNotification("RigSwitch", "Settings saved successfully.");
         }
@@ -439,19 +364,66 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task CheckForUpdatesManualAsync() => await CheckForUpdatesInternalAsync(isManual: true);
+
+    public async Task CheckForUpdatesAutoAsync()
+    {
+        _settings ??= await _settingsStorage.LoadSettingsAsync();
+        if (!_settings.EnableAutoUpdateCheck) return;
+        if (_settings.UpdateCheckSkippedUntil.HasValue && DateTime.UtcNow < _settings.UpdateCheckSkippedUntil.Value) return;
+
+        await CheckForUpdatesInternalAsync(isManual: false);
+    }
+
+    private async Task CheckForUpdatesInternalAsync(bool isManual)
+    {
+        IsBusy = true;
+        StatusMessage = "Checking for application updates...";
+        try
+        {
+            _settings ??= await _settingsStorage.LoadSettingsAsync();
+            var resultMsg = await UpdateCheckHandler.CheckForUpdatesAsync(
+                _updateCheckService,
+                _settings,
+                _settingsStorage,
+                isManual,
+                tag => IgnoredReleaseVersion = tag);
+
+            if (!string.IsNullOrWhiteSpace(resultMsg)) StatusMessage = resultMsg;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Update check error: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task HandleUpdateUserChoiceAsync(UpdateUserChoice choice, UpdateInfo updateInfo)
+    {
+        _settings ??= await _settingsStorage.LoadSettingsAsync();
+        var resultMsg = await UpdateCheckHandler.HandleUserChoiceAsync(
+            choice,
+            updateInfo,
+            _settings,
+            _settingsStorage,
+            tag => IgnoredReleaseVersion = tag);
+
+        if (!string.IsNullOrWhiteSpace(resultMsg)) StatusMessage = resultMsg;
+    }
+
     public void RegisterGlobalHotkeys(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-
         _hotkeyService.UnregisterAll();
         var failedHotkeys = new List<string>();
 
         void TryRegister(string? hotkey, Action action)
         {
             if (!string.IsNullOrWhiteSpace(hotkey) && !_hotkeyService.RegisterHotkey(hotkey, action))
-            {
                 failedHotkeys.Add(hotkey);
-            }
         }
 
         TryRegister(settings.ToggleHotkey, () =>
@@ -475,31 +447,17 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
 
         if (failedHotkeys.Count > 0)
-        {
             StatusMessage = $"Warning: Failed to register hotkey(s): {string.Join(", ", failedHotkeys)}";
-        }
     }
 
     private void OnDeskPresetActivated(PresetConfigurationItemViewModel activated)
     {
-        foreach (var preset in DeskPresets)
-        {
-            if (preset != activated)
-            {
-                preset.IsActive = false;
-            }
-        }
+        foreach (var preset in DeskPresets) if (preset != activated) preset.IsActive = false;
     }
 
     private void OnRigPresetActivated(PresetConfigurationItemViewModel activated)
     {
-        foreach (var preset in RigPresets)
-        {
-            if (preset != activated)
-            {
-                preset.IsActive = false;
-            }
-        }
+        foreach (var preset in RigPresets) if (preset != activated) preset.IsActive = false;
     }
 
     private async Task OnAudioVisibilityChangedAsync(AudioEndpointVisibilityItemViewModel item, bool isVisible)
@@ -507,24 +465,15 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         try
         {
             await _audioDirector.SetEndpointVisibilityAsync(item.Id, isVisible);
-
             if (_settings != null)
             {
                 if (isVisible)
-                {
                     _settings.HiddenAudioEndpointIds.RemoveAll(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id));
-                }
-                else
-                {
-                    if (!_settings.HiddenAudioEndpointIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id)))
-                    {
-                        _settings.HiddenAudioEndpointIds.Add(item.Id);
-                    }
-                }
+                else if (!_settings.HiddenAudioEndpointIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id)))
+                    _settings.HiddenAudioEndpointIds.Add(item.Id);
 
                 await _settingsStorage.SaveSettingsAsync(_settings);
             }
-
             StatusMessage = $"Audio endpoint '{item.Name}' {(isVisible ? "shown" : "hidden")}.";
         }
         catch (Exception ex)
@@ -536,19 +485,12 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
     private void OnProfileChanged(object? sender, ProfileChangedEventArgs e)
     {
-        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
-        {
-            CurrentProfile = _coordinator.CurrentProfile;
-        });
+        Application.Current?.Dispatcher?.Invoke(() => CurrentProfile = _coordinator.CurrentProfile);
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
+        if (_disposed) return;
         _disposed = true;
         _coordinator.ProfileChanged -= OnProfileChanged;
     }

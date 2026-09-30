@@ -10,6 +10,7 @@ using RigSwitch.App.Views;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Services;
+using RigSwitch.Infrastructure.Services;
 using RigSwitch.Infrastructure.Storage;
 using RigSwitch.Infrastructure.Windows.Ccd;
 using RigSwitch.Infrastructure.Windows.CoreAudio;
@@ -45,6 +46,7 @@ public partial class App : Application
             builder.Services.AddSingleton<IAudioEndpointDirector>(_ => new CoreAudioEndpointDirector());
             builder.Services.AddSingleton<IGlobalHotkeyService>(_ => new WindowsGlobalHotkeyService());
             builder.Services.AddSingleton<IApplicationLifecycleHookService>(_ => new WindowsApplicationLifecycleHookService());
+            builder.Services.AddSingleton<IUpdateCheckService>(_ => new UpdateCheckService());
             builder.Services.AddSingleton<IProfileSwitchCoordinator>(sp =>
                 new ProfileSwitchCoordinator(
                     sp.GetRequiredService<IDisplayConfigurationService>(),
@@ -129,6 +131,18 @@ public partial class App : Application
             {
                 ShowSettingsWindow();
             }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await viewModel.CheckForUpdatesAutoAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning($"Startup update check failed: {ex.Message}");
+                }
+            });
         }
         catch (Exception ex)
         {

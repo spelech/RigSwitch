@@ -164,6 +164,21 @@ public sealed record UserSettings
     public bool ShowToastNotifications { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether automatic update checks are performed on application startup.
+    /// </summary>
+    public bool EnableAutoUpdateCheck { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a specific release version tag that the user has chosen to ignore.
+    /// </summary>
+    public string IgnoredReleaseVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a timestamp until which update notification dialogs should be delayed.
+    /// </summary>
+    public DateTime? UpdateCheckSkippedUntil { get; set; }
+
+    /// <summary>
     /// Gets the currently active workstation preset for the specified profile mode safely.
     /// </summary>
     /// <param name="mode">The workstation profile mode.</param>

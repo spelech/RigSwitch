@@ -2,6 +2,7 @@ namespace RigSwitch.App.ViewModels;
 
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
+using RigSwitch.Core.Enums;
 using RigSwitch.Core.Models;
 
 /// <summary>
@@ -16,20 +17,10 @@ internal static partial class DeviceOptionResolver
     /// Determines whether two audio endpoint identifiers refer to the same physical device,
     /// comparing either direct strings or extracted GUID components.
     /// </summary>
-    /// <param name="idA">The first device identifier.</param>
-    /// <param name="idB">The second device identifier.</param>
-    /// <returns><c>true</c> if the identifiers match; otherwise, <c>false</c>.</returns>
     public static bool MatchesEndpoint(string? idA, string? idB)
     {
-        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB))
-        {
-            return false;
-        }
-
-        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
+        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB)) return false;
+        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase)) return true;
 
         var matchA = GuidPattern().Match(idA);
         var matchB = GuidPattern().Match(idB);
@@ -45,32 +36,41 @@ internal static partial class DeviceOptionResolver
     }
 
     /// <summary>
+    /// Filters an audio endpoint item based on search text and presence state filter selection.
+    /// </summary>
+    public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection)
+    {
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            bool nameMatch = item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            bool adapterMatch = item.Adapter.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            if (!nameMatch && !adapterMatch) return false;
+        }
+
+        if (string.Equals(filterSelection, "Active", StringComparison.OrdinalIgnoreCase))
+            return item.State == DevicePresenceState.Active;
+
+        if (string.Equals(filterSelection, "Inactive", StringComparison.OrdinalIgnoreCase))
+            return item.State != DevicePresenceState.Active;
+
+        return true;
+    }
+
+    /// <summary>
     /// Resolves a target audio endpoint ID against detected endpoints, adding an unlisted entry to options if missing.
     /// </summary>
-    /// <param name="targetId">The configured audio endpoint identifier.</param>
-    /// <param name="endpoints">Currently enumerated audio endpoints.</param>
-    /// <param name="options">Selection options collection bound to the view.</param>
-    /// <returns>The matched endpoint ID, or the original ID if disconnected.</returns>
     public static string ResolveAudioOption(
         string targetId,
         IEnumerable<AudioEndpointInfo> endpoints,
         ObservableCollection<DeviceSelectionOption> options)
     {
-        if (string.IsNullOrWhiteSpace(targetId))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(targetId)) return string.Empty;
 
         var match = endpoints.FirstOrDefault(a => MatchesEndpoint(a.Id, targetId));
-        if (match != null)
-        {
-            return match.Id;
-        }
+        if (match != null) return match.Id;
 
         if (!options.Any(opt => opt.Id == targetId))
-        {
             options.Add(new DeviceSelectionOption(targetId, $"{targetId} (Saved / Disconnected)"));
-        }
 
         return targetId;
     }
@@ -78,13 +78,9 @@ internal static partial class DeviceOptionResolver
     /// <summary>
     /// Ensures that a saved display monitor ID is present in the selectable options collection.
     /// </summary>
-    /// <param name="monitorId">The target monitor hardware identifier.</param>
-    /// <param name="options">Selection options collection bound to the view.</param>
     public static void EnsureDisplayOption(string monitorId, ObservableCollection<DeviceSelectionOption> options)
     {
         if (!string.IsNullOrWhiteSpace(monitorId) && !options.Any(opt => opt.Id == monitorId))
-        {
             options.Add(new DeviceSelectionOption(monitorId, $"{monitorId} (Saved / Disconnected)"));
-        }
     }
 }
