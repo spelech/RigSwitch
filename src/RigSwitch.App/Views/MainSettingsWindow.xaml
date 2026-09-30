@@ -11,6 +11,7 @@
         Height="620"
         MinWidth="700"
         MinHeight="540"
+        SizeToContent="Manual"
         WindowStartupLocation="CenterScreen"
         Background="#000000"
         Foreground="#FFFFFF"

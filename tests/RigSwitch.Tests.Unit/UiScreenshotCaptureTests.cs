@@ -92,8 +92,6 @@ public sealed class UiScreenshotCaptureTests
             System.IO.Directory.CreateDirectory(outDir);
 
             window.Show();
-            window.Measure(new Size(800, 640));
-            window.Arrange(new Rect(0, 0, 800, 640));
             window.UpdateLayout();
             SaveWindowToPng(window, System.IO.Path.Combine(outDir, "profiles_tab.png"));
 
