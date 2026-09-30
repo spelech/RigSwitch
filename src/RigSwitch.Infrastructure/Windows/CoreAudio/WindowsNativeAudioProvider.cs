@@ -39,15 +39,28 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
     }
 
     /// <inheritdoc/>
+    /// <inheritdoc/>
     public IReadOnlyList<AudioEndpointInfo> EnumerateRenderEndpoints()
+        => EnumerateEndpointsByFlow(EDataFlow.eRender, AudioDeviceFlow.Playback);
+
+    /// <inheritdoc/>
+    public IReadOnlyList<AudioEndpointInfo> EnumerateCaptureEndpoints()
+        => EnumerateEndpointsByFlow(EDataFlow.eCapture, AudioDeviceFlow.Capture);
+
+    private System.Collections.ObjectModel.ReadOnlyCollection<AudioEndpointInfo> EnumerateEndpointsByFlow(EDataFlow dataFlow, AudioDeviceFlow deviceFlow)
     {
         bool ownsEnumerator = _deviceEnumerator == null;
         var enumerator = _deviceEnumerator ?? CreateDeviceEnumerator();
 
         try
         {
-            string? defaultPlaybackId = GetDefaultEndpointId(enumerator, ERole.eMultimedia);
-            string? defaultCommunicationsId = GetDefaultEndpointId(enumerator, ERole.eCommunications);
+            string? defaultPlaybackId = deviceFlow == AudioDeviceFlow.Playback
+                ? GetDefaultEndpointId(enumerator, dataFlow, ERole.eMultimedia)
+                : null;
+            string? defaultCommunicationsId = GetDefaultEndpointId(enumerator, dataFlow, ERole.eCommunications);
+            string? defaultCaptureId = deviceFlow == AudioDeviceFlow.Capture
+                ? GetDefaultEndpointId(enumerator, dataFlow, ERole.eConsole)
+                : null;
 
             const DevicePresenceState allStates =
                 DevicePresenceState.Active |
@@ -55,7 +68,7 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
                 DevicePresenceState.NotPresent |
                 DevicePresenceState.Unplugged;
 
-            int hr = enumerator.EnumAudioEndpoints(EDataFlow.eRender, allStates, out var collection);
+            int hr = enumerator.EnumAudioEndpoints(dataFlow, allStates, out var collection);
             if (hr < 0 || collection == null)
             {
                 Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
@@ -120,13 +133,18 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
                         bool isDefaultCommunications = !string.IsNullOrEmpty(defaultCommunicationsId) &&
                             string.Equals(id, defaultCommunicationsId, StringComparison.OrdinalIgnoreCase);
 
+                        bool isDefaultCapture = !string.IsNullOrEmpty(defaultCaptureId) &&
+                            string.Equals(id, defaultCaptureId, StringComparison.OrdinalIgnoreCase);
+
                         endpoints.Add(new AudioEndpointInfo(
                             id: id,
                             name: friendlyName,
                             adapterDescription: adapterDescription,
                             state: state,
                             isDefaultPlayback: isDefaultPlayback,
-                            isDefaultCommunications: isDefaultCommunications));
+                            isDefaultCommunications: isDefaultCommunications,
+                            flow: deviceFlow,
+                            isDefaultCapture: isDefaultCapture));
                     }
                     finally
                     {
@@ -218,6 +236,108 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
         }
     }
 
+    /// <inheritdoc/>
+    public void SetEndpointVolume(string endpointId, float scalarLevel, bool isMuted)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointId);
+
+        bool ownsEnumerator = _deviceEnumerator == null;
+        var enumerator = _deviceEnumerator ?? CreateDeviceEnumerator();
+
+        try
+        {
+            int hr = enumerator.GetDevice(endpointId, out var device);
+            if (hr != 0 || device == null)
+            {
+                Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
+                return;
+            }
+
+            try
+            {
+                var iid = ComGuids.IidIAudioEndpointVolume;
+                hr = device.Activate(ref iid, ComGuids.CLSCTX_INPROC_SERVER, IntPtr.Zero, out var obj);
+                if (hr != 0 || obj is not IAudioEndpointVolume vol)
+                {
+                    Marshal.ThrowExceptionForHR(hr < 0 ? hr : unchecked((int)0x80004005));
+                    return;
+                }
+
+                try
+                {
+                    var ctx = Guid.Empty;
+                    vol.SetMasterVolumeLevelScalar(Math.Clamp(scalarLevel, 0.0f, 1.0f), ref ctx);
+                    vol.SetMute(isMuted, ref ctx);
+                }
+                finally
+                {
+                    SafeReleaseComObject(vol);
+                }
+            }
+            finally
+            {
+                SafeReleaseComObject(device);
+            }
+        }
+        finally
+        {
+            if (ownsEnumerator)
+            {
+                SafeReleaseComObject(enumerator);
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public (float ScalarLevel, bool IsMuted) GetEndpointVolume(string endpointId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointId);
+
+        bool ownsEnumerator = _deviceEnumerator == null;
+        var enumerator = _deviceEnumerator ?? CreateDeviceEnumerator();
+
+        try
+        {
+            int hr = enumerator.GetDevice(endpointId, out var device);
+            if (hr != 0 || device == null)
+            {
+                return (1.0f, false);
+            }
+
+            try
+            {
+                var iid = ComGuids.IidIAudioEndpointVolume;
+                hr = device.Activate(ref iid, ComGuids.CLSCTX_INPROC_SERVER, IntPtr.Zero, out var obj);
+                if (hr != 0 || obj is not IAudioEndpointVolume vol)
+                {
+                    return (1.0f, false);
+                }
+
+                try
+                {
+                    vol.GetMasterVolumeLevelScalar(out float level);
+                    vol.GetMute(out bool muted);
+                    return (level, muted);
+                }
+                finally
+                {
+                    SafeReleaseComObject(vol);
+                }
+            }
+            finally
+            {
+                SafeReleaseComObject(device);
+            }
+        }
+        finally
+        {
+            if (ownsEnumerator)
+            {
+                SafeReleaseComObject(enumerator);
+            }
+        }
+    }
+
     internal static string ExtractEndpointGuid(string endpointId)
     {
         var match = EndpointGuidRegex().Match(endpointId);
@@ -233,10 +353,12 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
     internal static void ApplyRegistryVisibilityFallback(string endpointId, bool isVisible)
     {
         string guidPart = ExtractEndpointGuid(endpointId);
-        string subKey = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{guidPart}";
+        string renderKey = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{guidPart}";
+        string captureKey = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture\{guidPart}";
 
-        using var key = Registry.LocalMachine.OpenSubKey(subKey, writable: true)
-            ?? throw new InvalidOperationException($"Registry key '{subKey}' could not be opened for writing.");
+        using var key = Registry.LocalMachine.OpenSubKey(renderKey, writable: true)
+            ?? Registry.LocalMachine.OpenSubKey(captureKey, writable: true)
+            ?? throw new InvalidOperationException($"Registry key for endpoint '{guidPart}' could not be opened for writing in Render or Capture.");
 
         // DeviceState: 1 = Active, 2 = Disabled
         int newState = isVisible ? 1 : 2;
@@ -269,11 +391,11 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
             ?? throw new InvalidOperationException("Failed to instantiate PolicyConfigClient."));
     }
 
-    private static string? GetDefaultEndpointId(IMMDeviceEnumerator enumerator, ERole role)
+    private static string? GetDefaultEndpointId(IMMDeviceEnumerator enumerator, EDataFlow flow, ERole role)
     {
         try
         {
-            int hr = enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, role, out var endpoint);
+            int hr = enumerator.GetDefaultAudioEndpoint(flow, role, out var endpoint);
             if (hr == 0 && endpoint != null)
             {
                 try

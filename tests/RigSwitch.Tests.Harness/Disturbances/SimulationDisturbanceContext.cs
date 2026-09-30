@@ -392,6 +392,42 @@ public sealed class SimulationDisturbanceContext
             }
         }
 
+        public Task<IReadOnlyList<AudioEndpointInfo>> EnumerateAudioEndpointsAsync(RigSwitch.Core.Enums.AudioDeviceFlow flow, CancellationToken cancellationToken = default)
+        {
+            lock (_context._stateLock)
+            {
+                IReadOnlyList<AudioEndpointInfo> snapshot = _context._audioEndpoints.Where(e => e.Flow == flow).ToList();
+                return Task.FromResult(snapshot);
+            }
+        }
+
+        public Task SetDefaultCaptureEndpointAsync(string endpointId, CancellationToken cancellationToken = default)
+        {
+            lock (_context._stateLock)
+            {
+                _context.Log($"[Audio] SetDefaultCaptureEndpoint: {endpointId}");
+                _context.RingBuffer.Record("SetDefaultCaptureEndpoint", input: endpointId, success: true);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task SetEndpointVolumeAsync(string endpointId, int volumePercent, bool isMuted, CancellationToken cancellationToken = default)
+        {
+            lock (_context._stateLock)
+            {
+                _context.Log($"[Audio] SetEndpointVolume: {endpointId}, Vol={volumePercent}%, Mute={isMuted}");
+                _context.RingBuffer.Record("SetEndpointVolume", input: volumePercent, success: true);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<(int VolumePercent, bool IsMuted)> GetEndpointVolumeAsync(string endpointId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult((100, false));
+        }
+
         public Task SetDefaultPlaybackEndpointAsync(string endpointId, CancellationToken cancellationToken = default)
         {
             lock (_context._stateLock)

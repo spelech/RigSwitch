@@ -23,13 +23,17 @@ public sealed record AudioEndpointInfo
     /// <param name="state">The device presence and connection state.</param>
     /// <param name="isDefaultPlayback">Whether the device is the default multimedia playback device.</param>
     /// <param name="isDefaultCommunications">Whether the device is the default communications device.</param>
+    /// <param name="flow">The audio data flow direction (playback or capture).</param>
+    /// <param name="isDefaultCapture">Whether the device is the default capture / recording device.</param>
     public AudioEndpointInfo(
         string id,
         string name,
         string adapterDescription,
         DevicePresenceState state,
         bool isDefaultPlayback,
-        bool isDefaultCommunications)
+        bool isDefaultCommunications,
+        AudioDeviceFlow flow = AudioDeviceFlow.Playback,
+        bool isDefaultCapture = false)
     {
         Id = id;
         Name = name;
@@ -37,6 +41,8 @@ public sealed record AudioEndpointInfo
         State = state;
         IsDefaultPlayback = isDefaultPlayback;
         IsDefaultCommunications = isDefaultCommunications;
+        Flow = flow;
+        IsDefaultCapture = isDefaultCapture;
     }
 
     /// <summary>
@@ -68,4 +74,14 @@ public sealed record AudioEndpointInfo
     /// Gets a value indicating whether this endpoint is the default communications device.
     /// </summary>
     public bool IsDefaultCommunications { get; init; }
+
+    /// <summary>
+    /// Gets the audio data flow direction (playback or capture).
+    /// </summary>
+    public AudioDeviceFlow Flow { get; init; } = AudioDeviceFlow.Playback;
+
+    /// <summary>
+    /// Gets a value indicating whether this endpoint is the default audio recording/capture device.
+    /// </summary>
+    public bool IsDefaultCapture { get; init; }
 }
