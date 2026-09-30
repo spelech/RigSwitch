@@ -10,6 +10,26 @@ public sealed record AudioVolumeSettings
     private int _volumePercent = 50;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="AudioVolumeSettings"/> class.
+    /// </summary>
+    public AudioVolumeSettings()
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AudioVolumeSettings"/> class with specified settings.
+    /// </summary>
+    /// <param name="mode">Volume behavior mode.</param>
+    /// <param name="volumePercent">Target volume percentage [0, 100].</param>
+    /// <param name="isMuted">Whether muted.</param>
+    public AudioVolumeSettings(PresetVolumeBehavior mode, int volumePercent, bool isMuted = false)
+    {
+        Mode = mode;
+        VolumePercent = volumePercent;
+        IsMuted = isMuted;
+    }
+
+    /// <summary>
     /// Gets or sets the volume behavior mode (Retain existing or apply Custom level).
     /// </summary>
     public PresetVolumeBehavior Mode { get; set; } = PresetVolumeBehavior.Retain;
