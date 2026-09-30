@@ -128,10 +128,30 @@ public sealed record UserSettings
         }
     }
 
+    private Dictionary<string, string> _customDeviceNames = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _cachedDeviceNames = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Gets or sets user-defined friendly name overrides keyed by device identifier.
     /// </summary>
-    public Dictionary<string, string> CustomDeviceNames { get; set; } = new();
+    public Dictionary<string, string> CustomDeviceNames
+    {
+        get => _customDeviceNames;
+        set => _customDeviceNames = value != null
+            ? new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Gets or sets cached friendly display names for known devices, keyed by hardware or endpoint ID.
+    /// </summary>
+    public Dictionary<string, string> CachedDeviceNames
+    {
+        get => _cachedDeviceNames;
+        set => _cachedDeviceNames = value != null
+            ? new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Gets or sets the list of audio endpoint GUID identifiers to hide or disable.

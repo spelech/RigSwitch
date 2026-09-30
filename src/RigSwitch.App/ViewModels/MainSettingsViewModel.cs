@@ -201,11 +201,28 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             var displays = await _displayService.EnumerateDisplaysAsync(cancellationToken);
             DetectedDisplays.Clear();
-            foreach (var d in displays) DetectedDisplays.Add(d);
+            foreach (var d in displays)
+            {
+                DetectedDisplays.Add(d);
+                if (!string.IsNullOrWhiteSpace(d.FriendlyName))
+                {
+                    _settings.CachedDeviceNames[d.MonitorId] = d.FriendlyName;
+                }
+            }
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
             DetectedAudioEndpoints.Clear();
-            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active)) DetectedAudioEndpoints.Add(a);
+            foreach (var a in audioEndpoints)
+            {
+                if (a.State == DevicePresenceState.Active)
+                {
+                    DetectedAudioEndpoints.Add(a);
+                }
+                if (!string.IsNullOrWhiteSpace(a.Name))
+                {
+                    _settings.CachedDeviceNames[a.Id] = a.Name;
+                }
+            }
 
             AvailableDisplayOptions.Clear();
             AvailableDisplayOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Display (Unassigned) —"));
@@ -225,20 +242,20 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
             }
 
-            DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions);
-            DeviceOptionResolver.EnsureDisplayOption(RigMonitorId, AvailableDisplayOptions);
+            DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+            DeviceOptionResolver.EnsureDisplayOption(RigMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
 
-            DeskPrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(DeskPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
-            DeskFallbackAudioId = DeviceOptionResolver.ResolveAudioOption(DeskFallbackAudioId, audioEndpoints, AvailableAudioOptions);
-            RigPrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(RigPrimaryAudioId, audioEndpoints, AvailableAudioOptions);
+            DeskPrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(DeskPrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+            DeskFallbackAudioId = DeviceOptionResolver.ResolveAudioOption(DeskFallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+            RigPrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(RigPrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
 
             DeskPresets.Clear();
             for (int i = 0; i < _settings.DeskPresets.Count; i++)
             {
                 var preset = _settings.DeskPresets[i];
-                DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions);
-                preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions);
-                preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions);
+                DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 DeskPresets.Add(new PresetConfigurationItemViewModel(preset, i, "DeskActivePreset", i == _settings.ActiveDeskPresetIndex, OnDeskPresetActivated));
             }
 
@@ -246,17 +263,33 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             for (int i = 0; i < _settings.RigPresets.Count; i++)
             {
                 var preset = _settings.RigPresets[i];
-                DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions);
-                preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions);
-                preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions);
+                DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 RigPresets.Add(new PresetConfigurationItemViewModel(preset, i, "RigActivePreset", i == _settings.ActiveRigPresetIndex, OnRigPresetActivated));
             }
 
             DeviceNicknames.Clear();
+            var seenNicknameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var d in displays)
+            {
                 DeviceNicknames.Add(new DeviceNicknameItemViewModel(d.MonitorId, "Display", d.FriendlyName, _settings.CustomDeviceNames.GetValueOrDefault(d.MonitorId, string.Empty)));
+                seenNicknameIds.Add(d.MonitorId);
+            }
             foreach (var a in audioEndpoints)
+            {
                 DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, "Audio Playback", a.Name, _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty)));
+                seenNicknameIds.Add(a.Id);
+            }
+            foreach (var (id, cachedName) in _settings.CachedDeviceNames)
+            {
+                if (!seenNicknameIds.Contains(id))
+                {
+                    string kind = id.Contains('{') ? "Audio (Offline)" : "Display (Offline)";
+                    DeviceNicknames.Add(new DeviceNicknameItemViewModel(id, kind, $"{cachedName} (Offline)", _settings.CustomDeviceNames.GetValueOrDefault(id, string.Empty)));
+                    seenNicknameIds.Add(id);
+                }
+            }
 
             AudioEndpointsVisibility.Clear();
             var hiddenList = _settings.HiddenAudioEndpointIds;
