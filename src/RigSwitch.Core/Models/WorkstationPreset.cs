@@ -67,6 +67,26 @@ public sealed record WorkstationPreset
     public string FallbackAudioId { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the primary microphone / capture endpoint device identifier.
+    /// </summary>
+    public string PrimaryMicrophoneId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the fallback microphone / capture endpoint device identifier.
+    /// </summary>
+    public string FallbackMicrophoneId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the target playback audio volume and mute settings for this preset.
+    /// </summary>
+    public AudioVolumeSettings PlaybackVolume { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the target microphone input volume and mute settings for this preset.
+    /// </summary>
+    public AudioVolumeSettings MicrophoneVolume { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the direct hotkey combination used to activate this preset.
     /// </summary>
     public string DirectHotkey { get; set; } = string.Empty;

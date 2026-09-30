@@ -128,6 +128,75 @@ public sealed record UserSettings
         }
     }
 
+    private string _deskPrimaryMicrophoneId = string.Empty;
+    private string _deskFallbackMicrophoneId = string.Empty;
+    private string _rigPrimaryMicrophoneId = string.Empty;
+    private string _rigFallbackMicrophoneId = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the primary microphone endpoint GUID identifier for the active Desk preset.
+    /// </summary>
+    public string DeskPrimaryMicrophoneId
+    {
+        get => DeskPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.Desk).PrimaryMicrophoneId : _deskPrimaryMicrophoneId;
+        set
+        {
+            _deskPrimaryMicrophoneId = value ?? string.Empty;
+            if (DeskPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.Desk).PrimaryMicrophoneId = _deskPrimaryMicrophoneId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the fallback microphone endpoint GUID identifier for the active Desk preset.
+    /// </summary>
+    public string DeskFallbackMicrophoneId
+    {
+        get => DeskPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.Desk).FallbackMicrophoneId : _deskFallbackMicrophoneId;
+        set
+        {
+            _deskFallbackMicrophoneId = value ?? string.Empty;
+            if (DeskPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.Desk).FallbackMicrophoneId = _deskFallbackMicrophoneId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the primary microphone endpoint GUID identifier for the active Sim Rig preset.
+    /// </summary>
+    public string RigPrimaryMicrophoneId
+    {
+        get => RigPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.SimRig).PrimaryMicrophoneId : _rigPrimaryMicrophoneId;
+        set
+        {
+            _rigPrimaryMicrophoneId = value ?? string.Empty;
+            if (RigPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.SimRig).PrimaryMicrophoneId = _rigPrimaryMicrophoneId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the fallback microphone endpoint GUID identifier for the active Sim Rig preset.
+    /// </summary>
+    public string RigFallbackMicrophoneId
+    {
+        get => RigPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.SimRig).FallbackMicrophoneId : _rigFallbackMicrophoneId;
+        set
+        {
+            _rigFallbackMicrophoneId = value ?? string.Empty;
+            if (RigPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.SimRig).FallbackMicrophoneId = _rigFallbackMicrophoneId;
+            }
+        }
+    }
+
     private Dictionary<string, string> _customDeviceNames = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _cachedDeviceNames = new(StringComparer.OrdinalIgnoreCase);
 
