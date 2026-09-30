@@ -29,4 +29,25 @@ public interface INativeCcdProvider
     /// <param name="flags">Flags specifying configuration behavior and database persistence.</param>
     /// <returns>A Win32 error code (0 for ERROR_SUCCESS).</returns>
     int SetDisplayConfig(DISPLAYCONFIG_PATH_INFO[] paths, DISPLAYCONFIG_MODE_INFO[] modes, SetDisplayConfigFlags flags);
+
+    /// <summary>
+    /// Retrieves Advanced Color (HDR) capabilities and state for a display target.
+    /// </summary>
+    /// <param name="advancedColorInfo">The structure to populate with advanced color information.</param>
+    /// <returns>A Win32 error code (0 for ERROR_SUCCESS).</returns>
+    int GetAdvancedColorInfo(ref DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO advancedColorInfo);
+
+    /// <summary>
+    /// Sets the Advanced Color state (type 10) for a display target.
+    /// </summary>
+    /// <param name="advancedColorState">The structure containing the desired advanced color state.</param>
+    /// <returns>A Win32 error code (0 for ERROR_SUCCESS).</returns>
+    int SetAdvancedColorState(ref DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE advancedColorState);
+
+    /// <summary>
+    /// Sets the native HDR state (type 16) for a display target (Windows 11 24H2+).
+    /// </summary>
+    /// <param name="hdrState">The structure containing the desired HDR state.</param>
+    /// <returns>A Win32 error code (0 for ERROR_SUCCESS).</returns>
+    int SetHdrState(ref DISPLAYCONFIG_SET_HDR_STATE hdrState);
 }

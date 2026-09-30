@@ -36,4 +36,21 @@ public interface IDisplayConfigurationService
         var inactives = string.IsNullOrWhiteSpace(inactiveMonitorId) ? null : new[] { inactiveMonitorId };
         return ApplyDisplayTopologyAsync(targets, inactives, cancellationToken);
     }
+
+    /// <summary>
+    /// Retrieves native Windows HDR and Advanced Color status for the specified monitor.
+    /// </summary>
+    /// <param name="monitorId">The EDID, hardware ID, or device path of the monitor.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A <see cref="DisplayHdrInfo"/> representing HDR capabilities and active state, or null if the monitor is not found.</returns>
+    Task<DisplayHdrInfo?> GetHdrInfoAsync(string monitorId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the native Windows HDR / Advanced Color state on the specified monitor using Windows CCD APIs.
+    /// </summary>
+    /// <param name="monitorId">The EDID, hardware ID, or device path of the monitor.</param>
+    /// <param name="enableHdr">True to enable HDR / Advanced Color; false to disable HDR.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task SetHdrStateAsync(string monitorId, bool enableHdr, CancellationToken cancellationToken = default);
 }

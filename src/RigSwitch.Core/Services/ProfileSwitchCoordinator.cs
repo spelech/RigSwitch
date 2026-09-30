@@ -142,6 +142,27 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             // Step 3: Apply Display Topology
             await _displayConfigService.ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken).ConfigureAwait(false);
 
+            // Step 3B: Apply Native HDR Mode (if configured)
+            if (preset.HdrMode != PresetHdrMode.Retain)
+            {
+                bool enableHdr = preset.HdrMode == PresetHdrMode.Enable;
+                foreach (var monitorId in targetMonitorIds)
+                {
+                    try
+                    {
+                        await _displayConfigService.SetHdrStateAsync(monitorId, enableHdr, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to apply HDR mode ({preset.HdrMode}) on monitor '{monitorId}': {ex.Message}");
+                    }
+                }
+            }
+
             // Step 4: Multi-tier Audio Resolution & Routing
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
             var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();

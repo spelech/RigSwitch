@@ -606,5 +606,83 @@ public sealed class ProfileSwitchCoordinatorTests
         Assert.True(result, "Profile switch should succeed even if volume adjustment encounters an error.");
         Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
     }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_Enable_CallsSetHdrStateTrueForTargetMonitors()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId, "EXTRA_MON"];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Enable;
+
+        _displayService.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new DisplayDeviceInfo(DeskMonitorId, @"\\.\DISPLAY1", "MPG341CQPX", "GPU", true, true),
+                new DisplayDeviceInfo("EXTRA_MON", @"\\.\DISPLAY2", "Secondary", "GPU", true, false)
+            ]);
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _displayService.Received(1).SetHdrStateAsync(DeskMonitorId, true, Arg.Any<CancellationToken>());
+        await _displayService.Received(1).SetHdrStateAsync("EXTRA_MON", true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_Disable_CallsSetHdrStateFalseForTargetMonitors()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Disable;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _displayService.Received(1).SetHdrStateAsync(DeskMonitorId, false, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_Retain_DoesNotCallSetHdrState()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Retain;
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result);
+        await _displayService.DidNotReceiveWithAnyArgs().SetHdrStateAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task SwitchToPresetAsync_HdrMode_FaultTolerance_ContinuesOnHdrException()
+    {
+        // Arrange
+        _defaultSettings.DeskPresets[1].TargetMonitorIds = [DeskMonitorId];
+        _defaultSettings.DeskPresets[1].HdrMode = PresetHdrMode.Enable;
+
+        _displayService.SetHdrStateAsync(DeskMonitorId, true, Arg.Any<CancellationToken>())
+            .Throws(new NotSupportedException("Monitor does not support HDR"));
+
+        using var coordinator = new ProfileSwitchCoordinator(_displayService, _audioDirector, _settingsService, ProfileMode.Desk);
+
+        // Act
+        var result = await coordinator.SwitchToPresetAsync(ProfileMode.Desk, 1);
+
+        // Assert
+        Assert.True(result, "Profile switch should succeed even if HDR application throws an exception.");
+        Assert.Equal(ProfileMode.Desk, coordinator.CurrentProfile);
+    }
 }
 

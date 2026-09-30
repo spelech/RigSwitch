@@ -372,6 +372,43 @@ public sealed class SimulationDisturbanceContext
             var inactives = string.IsNullOrWhiteSpace(inactiveMonitorId) ? null : new[] { inactiveMonitorId };
             return ApplyDisplayTopologyAsync(targets, inactives, cancellationToken);
         }
+
+        public Task<DisplayHdrInfo?> GetHdrInfoAsync(string monitorId, CancellationToken cancellationToken = default)
+        {
+            lock (_context._stateLock)
+            {
+                var display = _context._displays.FirstOrDefault(d => string.Equals(d.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase));
+                if (display == null)
+                {
+                    return Task.FromResult<DisplayHdrInfo?>(null);
+                }
+
+                return Task.FromResult<DisplayHdrInfo?>(new DisplayHdrInfo(
+                    display.MonitorId,
+                    display.SupportsHdr,
+                    display.IsHdrEnabled,
+                    WideColorEnforced: false,
+                    ColorEncoding: RigSwitch.Core.Enums.DisplayColorEncoding.Rgb,
+                    BitsPerColorChannel: 10));
+            }
+        }
+
+        public Task SetHdrStateAsync(string monitorId, bool enableHdr, CancellationToken cancellationToken = default)
+        {
+            lock (_context._stateLock)
+            {
+                var idx = _context._displays.FindIndex(d => string.Equals(d.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase));
+                if (idx < 0)
+                {
+                    throw new InvalidOperationException($"Display '{monitorId}' not found in simulation.");
+                }
+
+                var d = _context._displays[idx];
+                _context._displays[idx] = new DisplayDeviceInfo(d.MonitorId, d.DevicePath, d.FriendlyName, d.DisplayAdapter, d.IsActive, d.IsPrimary, d.SupportsHdr, isHdrEnabled: enableHdr);
+                _context.Log($"[Display] Set HDR on {monitorId}: {enableHdr}");
+                return Task.CompletedTask;
+            }
+        }
     }
 
     private sealed class SimulatedAudioDirector : IAudioEndpointDirector
