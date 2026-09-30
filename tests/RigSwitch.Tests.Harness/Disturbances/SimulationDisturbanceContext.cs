@@ -69,7 +69,9 @@ public sealed class SimulationDisturbanceContext
             "MPG341CQPX OLED",
             "NVIDIA RTX 4070 Ti",
             isActive: true,
-            isPrimary: true));
+            isPrimary: true,
+            supportsHdr: true,
+            isHdrEnabled: false));
 
         _displays.Add(new DisplayDeviceInfo(
             Settings.RigMonitorId,
@@ -77,7 +79,9 @@ public sealed class SimulationDisturbanceContext
             "VG34VQL3A",
             "NVIDIA RTX 4070 Ti",
             isActive: false,
-            isPrimary: false));
+            isPrimary: false,
+            supportsHdr: true,
+            isHdrEnabled: false));
 
         foreach (var preset in Settings.DeskPresets.Concat(Settings.RigPresets))
         {
@@ -90,20 +94,23 @@ public sealed class SimulationDisturbanceContext
                     preset.Name,
                     "NVIDIA RTX 4070 Ti",
                     isActive: false,
-                    isPrimary: false));
+                    isPrimary: false,
+                    supportsHdr: true,
+                    isHdrEnabled: false));
             }
         }
 
         _initialDisplaysBackup.AddRange(_displays);
 
-        // Default audio endpoints
+        // Default audio endpoints (Playback)
         _audioEndpoints.Add(new AudioEndpointInfo(
             Settings.DeskPrimaryAudioId,
             "Speakers (Pebble V3)",
             "Realtek Audio",
             DevicePresenceState.Active,
             isDefaultPlayback: true,
-            isDefaultCommunications: false));
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Playback));
 
         _audioEndpoints.Add(new AudioEndpointInfo(
             Settings.DeskFallbackAudioId,
@@ -111,7 +118,8 @@ public sealed class SimulationDisturbanceContext
             "NVIDIA High Definition Audio",
             DevicePresenceState.Active,
             isDefaultPlayback: false,
-            isDefaultCommunications: false));
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Playback));
 
         _audioEndpoints.Add(new AudioEndpointInfo(
             Settings.RigPrimaryAudioId,
@@ -119,7 +127,8 @@ public sealed class SimulationDisturbanceContext
             "NVIDIA High Definition Audio",
             DevicePresenceState.Active,
             isDefaultPlayback: false,
-            isDefaultCommunications: false));
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Playback));
 
         _audioEndpoints.Add(new AudioEndpointInfo(
             "{00000000-0000-0000-0000-000000000004}",
@@ -127,7 +136,8 @@ public sealed class SimulationDisturbanceContext
             "Realtek Audio",
             DevicePresenceState.Active,
             isDefaultPlayback: false,
-            isDefaultCommunications: false));
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Playback));
 
         _audioEndpoints.Add(new AudioEndpointInfo(
             "{00000000-0000-0000-0000-000000000005}",
@@ -135,7 +145,36 @@ public sealed class SimulationDisturbanceContext
             "USB Audio Device",
             DevicePresenceState.Active,
             isDefaultPlayback: false,
-            isDefaultCommunications: false));
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Playback));
+
+        // Default microphone / capture endpoints
+        _audioEndpoints.Add(new AudioEndpointInfo(
+            "{MIC-DESK-GUID}",
+            "Elgato Wave:3 (Desk Mic)",
+            "Elgato Audio",
+            DevicePresenceState.Active,
+            isDefaultPlayback: false,
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Capture));
+
+        _audioEndpoints.Add(new AudioEndpointInfo(
+            "{MIC-RIG-GUID}",
+            "ModMic Wireless (Rig Mic)",
+            "Antlion Audio",
+            DevicePresenceState.Active,
+            isDefaultPlayback: false,
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Capture));
+
+        _audioEndpoints.Add(new AudioEndpointInfo(
+            "{MIC-FALLBACK-GUID}",
+            "Realtek Audio Mic",
+            "Realtek",
+            DevicePresenceState.Active,
+            isDefaultPlayback: false,
+            isDefaultCommunications: false,
+            flow: AudioDeviceFlow.Capture));
 
         foreach (var preset in Settings.DeskPresets.Concat(Settings.RigPresets))
         {
@@ -148,11 +187,13 @@ public sealed class SimulationDisturbanceContext
                     "Audio Adapter",
                     DevicePresenceState.Active,
                     isDefaultPlayback: false,
-                    isDefaultCommunications: false));
+                    isDefaultCommunications: false,
+                    flow: AudioDeviceFlow.Playback));
             }
         }
 
         ActiveDefaultAudioId = Settings.DeskPrimaryAudioId;
+        ActiveDefaultCaptureId = "{MIC-DESK-GUID}";
 
         DisplayService = new SimulatedDisplayService(this);
         AudioDirector = new SimulatedAudioDirector(this);
@@ -182,12 +223,37 @@ public sealed class SimulationDisturbanceContext
 
     public string? ActiveDefaultAudioId { get; private set; }
 
+    public string? ActiveDefaultCaptureId { get; private set; }
+
+    public Dictionary<string, (int VolumePercent, bool IsMuted)> EndpointVolumes { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public bool IsMonitorActive(string monitorId)
     {
         lock (_stateLock)
         {
             return _displays.Any(d =>
                 string.Equals(d.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase) && d.IsActive);
+        }
+    }
+
+    public bool IsHdrEnabled(string monitorId)
+    {
+        lock (_stateLock)
+        {
+            var match = _displays.FirstOrDefault(d => string.Equals(d.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase));
+            return match?.IsHdrEnabled ?? false;
+        }
+    }
+
+    public (int VolumePercent, bool IsMuted)? GetEndpointVolume(string endpointId)
+    {
+        lock (_stateLock)
+        {
+            if (EndpointVolumes.TryGetValue(endpointId, out var state))
+            {
+                return state;
+            }
+            return null;
         }
     }
 
@@ -257,10 +323,25 @@ public sealed class SimulationDisturbanceContext
                     existing.AdapterDescription,
                     newState,
                     existing.IsDefaultPlayback,
-                    existing.IsDefaultCommunications);
+                    existing.IsDefaultCommunications,
+                    flow: existing.Flow);
 
                 Log($"[Disturbance] Audio endpoint '{endpointId}' state changed to {newState}.");
                 RingBuffer.Record("Disturbance_AudioStateChange", input: endpointId, result: newState);
+            }
+        }
+    }
+
+    public void SimulateAudioDisconnect(string endpointId)
+    {
+        lock (_stateLock)
+        {
+            var match = _audioEndpoints.FirstOrDefault(e => string.Equals(e.Id, endpointId, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                _audioEndpoints.Remove(match);
+                Log($"[Disturbance] Audio endpoint '{endpointId}' ({match.Name}) disconnected/unplugged.");
+                RingBuffer.Record("Disturbance_AudioDisconnect", input: endpointId);
             }
         }
     }
@@ -442,6 +523,24 @@ public sealed class SimulationDisturbanceContext
         {
             lock (_context._stateLock)
             {
+                _context.ActiveDefaultCaptureId = endpointId;
+                for (var i = 0; i < _context._audioEndpoints.Count; i++)
+                {
+                    var ep = _context._audioEndpoints[i];
+                    if (ep.Flow == AudioDeviceFlow.Capture)
+                    {
+                        var isMatch = string.Equals(ep.Id, endpointId, StringComparison.OrdinalIgnoreCase);
+                        _context._audioEndpoints[i] = new AudioEndpointInfo(
+                            ep.Id,
+                            ep.Name,
+                            ep.AdapterDescription,
+                            ep.State,
+                            isDefaultPlayback: false,
+                            isDefaultCommunications: false,
+                            flow: AudioDeviceFlow.Capture);
+                    }
+                }
+
                 _context.Log($"[Audio] SetDefaultCaptureEndpoint: {endpointId}");
                 _context.RingBuffer.Record("SetDefaultCaptureEndpoint", input: endpointId, success: true);
             }
@@ -453,6 +552,7 @@ public sealed class SimulationDisturbanceContext
         {
             lock (_context._stateLock)
             {
+                _context.EndpointVolumes[endpointId] = (volumePercent, isMuted);
                 _context.Log($"[Audio] SetEndpointVolume: {endpointId}, Vol={volumePercent}%, Mute={isMuted}");
                 _context.RingBuffer.Record("SetEndpointVolume", input: volumePercent, success: true);
             }
@@ -462,7 +562,15 @@ public sealed class SimulationDisturbanceContext
 
         public Task<(int VolumePercent, bool IsMuted)> GetEndpointVolumeAsync(string endpointId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult((100, false));
+            lock (_context._stateLock)
+            {
+                if (_context.EndpointVolumes.TryGetValue(endpointId, out var state))
+                {
+                    return Task.FromResult(state);
+                }
+
+                return Task.FromResult((100, false));
+            }
         }
 
         public Task SetDefaultPlaybackEndpointAsync(string endpointId, CancellationToken cancellationToken = default)
@@ -474,7 +582,14 @@ public sealed class SimulationDisturbanceContext
                 {
                     var ep = _context._audioEndpoints[i];
                     var isMatch = string.Equals(ep.Id, endpointId, StringComparison.OrdinalIgnoreCase);
-                    _context._audioEndpoints[i] = new AudioEndpointInfo(ep.Id, ep.Name, ep.AdapterDescription, ep.State, isDefaultPlayback: isMatch, ep.IsDefaultCommunications);
+                    _context._audioEndpoints[i] = new AudioEndpointInfo(
+                        ep.Id,
+                        ep.Name,
+                        ep.AdapterDescription,
+                        ep.State,
+                        isDefaultPlayback: isMatch,
+                        isDefaultCommunications: ep.IsDefaultCommunications,
+                        flow: ep.Flow);
                 }
 
                 _context.Log($"[Audio] SetDefaultPlaybackEndpoint: {endpointId}");
