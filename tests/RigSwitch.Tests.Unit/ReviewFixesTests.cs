@@ -9,6 +9,7 @@ using RigSwitch.Core.Services;
 using RigSwitch.Infrastructure.Windows.Ccd;
 using Xunit;
 
+[Collection("WpfUi")]
 public sealed class ReviewFixesTests
 {
     private readonly IDisplayConfigurationService _displayService;

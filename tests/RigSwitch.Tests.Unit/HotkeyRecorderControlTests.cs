@@ -4,6 +4,7 @@ using System.Windows.Input;
 using RigSwitch.App.Controls;
 using Xunit;
 
+[Collection("WpfUi")]
 public sealed class HotkeyRecorderControlTests
 {
     [Fact]
