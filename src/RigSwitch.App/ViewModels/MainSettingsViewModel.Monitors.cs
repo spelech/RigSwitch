@@ -77,6 +77,8 @@ public partial class MainSettingsViewModel
         var rigMonitorIds = rigPreset.TargetMonitorIds;
 
         int number = 1;
+        var seenMonitorIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var display in displays)
         {
             var pile = MonitorPileAssignment.Unassigned;
@@ -99,6 +101,58 @@ public partial class MainSettingsViewModel
                 movePileAction: OnTilePileMoved);
 
             MonitorTiles.Add(tile);
+            seenMonitorIds.Add(display.MonitorId);
+        }
+
+        var allConfiguredMonitorIds = new List<string>();
+        foreach (var id in deskMonitorIds)
+        {
+            if (!string.IsNullOrWhiteSpace(id) && !seenMonitorIds.Contains(id) && !allConfiguredMonitorIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+            {
+                allConfiguredMonitorIds.Add(id);
+            }
+        }
+        foreach (var id in rigMonitorIds)
+        {
+            if (!string.IsNullOrWhiteSpace(id) && !seenMonitorIds.Contains(id) && !allConfiguredMonitorIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+            {
+                allConfiguredMonitorIds.Add(id);
+            }
+        }
+
+        foreach (var monitorId in allConfiguredMonitorIds)
+        {
+            var pile = MonitorPileAssignment.Unassigned;
+            if (deskMonitorIds.Contains(monitorId, StringComparer.OrdinalIgnoreCase))
+            {
+                pile = MonitorPileAssignment.Desk;
+            }
+            else if (rigMonitorIds.Contains(monitorId, StringComparer.OrdinalIgnoreCase))
+            {
+                pile = MonitorPileAssignment.SimRig;
+            }
+
+            string friendlyName = monitorId;
+            if (settings.CustomDeviceNames.TryGetValue(monitorId, out var nick) && !string.IsNullOrWhiteSpace(nick))
+            {
+                friendlyName = nick;
+            }
+            else if (settings.CachedDeviceNames.TryGetValue(monitorId, out var cached) && !string.IsNullOrWhiteSpace(cached))
+            {
+                friendlyName = cached;
+            }
+
+            var tile = new DisplayMonitorTileViewModel(
+                displayNumber: number++,
+                monitorId: monitorId,
+                friendlyName: friendlyName,
+                pile: pile,
+                isPrimary: false,
+                isActive: false,
+                movePileAction: OnTilePileMoved);
+
+            MonitorTiles.Add(tile);
+            seenMonitorIds.Add(monitorId);
         }
     }
 

@@ -244,7 +244,8 @@
 
         <!-- Monitor Tile Template for Drag-and-Drop / Pile Management -->
         <DataTemplate x:Key="MonitorTileTemplate" DataType="{x:Type vm:DisplayMonitorTileViewModel}">
-            <Border Background="#050508"
+            <Border x:Name="TileBorder"
+                    Background="#050508"
                     BorderBrush="{StaticResource OledBorderBright}"
                     BorderThickness="1"
                     CornerRadius="8"
@@ -259,7 +260,8 @@
                     </Grid.RowDefinitions>
 
                     <!-- Tile Header Badge -->
-                    <Border Grid.Row="0"
+                    <Border x:Name="HeaderBadge"
+                            Grid.Row="0"
                             Background="#0A0A10"
                             BorderBrush="{StaticResource AccentGreen}"
                             BorderThickness="1.5"
@@ -267,7 +269,8 @@
                             Padding="8,4"
                             HorizontalAlignment="Center"
                             Margin="0,0,0,8">
-                        <TextBlock Text="{Binding DisplayNumber, StringFormat='Monitor {0}'}"
+                        <TextBlock x:Name="HeaderText"
+                                   Text="{Binding DisplayNumber, StringFormat='Monitor {0}'}"
                                    FontWeight="ExtraBold"
                                    FontSize="16"
                                    Foreground="{StaticResource AccentGreen}" />
@@ -286,6 +289,14 @@
                                    TextAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
                                    MaxWidth="140" />
+                        <TextBlock x:Name="OfflineStatusText"
+                                   Text="Offline / Disconnected"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FF8888"
+                                   TextAlignment="Center"
+                                   Visibility="Collapsed"
+                                   Margin="0,2,0,0" />
                     </StackPanel>
 
                     <!-- Pile Action Buttons -->
@@ -313,6 +324,14 @@
                     </UniformGrid>
                 </Grid>
             </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsActive}" Value="False">
+                    <Setter TargetName="TileBorder" Property="Opacity" Value="0.75" />
+                    <Setter TargetName="HeaderBadge" Property="BorderBrush" Value="#555577" />
+                    <Setter TargetName="HeaderText" Property="Foreground" Value="#8E95A5" />
+                    <Setter TargetName="OfflineStatusText" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <!-- Modern Motorsport Tab Styling -->
