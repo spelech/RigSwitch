@@ -186,10 +186,25 @@ public interface IMMDeviceEnumerator
     int GetDevice([MarshalAs(UnmanagedType.LPWStr)] string pwstrId, out IMMDevice ppDevice);
 
     [PreserveSig]
-    int RegisterEndpointNotificationCallback(IntPtr pClient);
+    int RegisterEndpointNotificationCallback([MarshalAs(UnmanagedType.Interface)] IMMNotificationClient pClient);
 
     [PreserveSig]
-    int UnregisterEndpointNotificationCallback(IntPtr pClient);
+    int UnregisterEndpointNotificationCallback([MarshalAs(UnmanagedType.Interface)] IMMNotificationClient pClient);
+}
+
+/// <summary>
+/// CoreAudio endpoint notification client COM interface.
+/// </summary>
+[ComImport]
+[Guid("79912872-C81A-4839-B470-B0E73A16A602")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IMMNotificationClient
+{
+    void OnDeviceStateChanged([MarshalAs(UnmanagedType.LPWStr)] string pwstrDeviceId, DevicePresenceState dwNewState);
+    void OnDeviceAdded([MarshalAs(UnmanagedType.LPWStr)] string pwstrDeviceId);
+    void OnDeviceRemoved([MarshalAs(UnmanagedType.LPWStr)] string pwstrDeviceId);
+    void OnDefaultDeviceChanged(EDataFlow flow, ERole role, [MarshalAs(UnmanagedType.LPWStr)] string pwstrDefaultDeviceId);
+    void OnPropertyValueChanged([MarshalAs(UnmanagedType.LPWStr)] string pwstrDeviceId, PROPERTYKEY key);
 }
 
 /// <summary>
@@ -324,4 +339,5 @@ public static class ComGuids
     public static readonly Guid ClsidPolicyConfigClient = new("870af99c-171d-4f9e-af0d-e63df40c2bc9");
     public static readonly Guid IidPolicyConfig = new("f8679f50-850a-41cf-9c72-430f290290c8");
     public static readonly Guid IidIAudioEndpointVolume = new("5BC648DE-182D-4E46-85F0-CF0B54332D6E");
+    public static readonly Guid IidIMMNotificationClient = new("79912872-C81A-4839-B470-B0E73A16A602");
 }

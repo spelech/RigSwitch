@@ -9,17 +9,37 @@ using RigSwitch.Core.Models;
 /// <summary>
 /// Implements <see cref="INativeAudioProvider"/> using Windows CoreAudio COM interfaces and registry fallback.
 /// </summary>
-public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
+public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, IMMNotificationClient, IDisposable
 {
     private readonly IMMDeviceEnumerator? _deviceEnumerator;
     private readonly IPolicyConfig? _policyConfig;
     private readonly Action<string, bool>? _registryFallbackAction;
+    private readonly bool _ownsEnumerator;
+    private bool _isCallbackRegistered;
+    private bool _disposed;
+
+    /// <inheritdoc/>
+    public event Action<EDataFlow, ERole, string>? DefaultDeviceChanged;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowsNativeAudioProvider"/> class using live Windows COM activations.
     /// </summary>
     public WindowsNativeAudioProvider()
     {
+        try
+        {
+            _deviceEnumerator = CreateDeviceEnumerator();
+            _ownsEnumerator = true;
+            int hr = _deviceEnumerator.RegisterEndpointNotificationCallback(this);
+            if (hr == 0)
+            {
+                _isCallbackRegistered = true;
+            }
+        }
+        catch
+        {
+            // Fallback gracefully when COM or audio services are not available
+        }
     }
 
     /// <summary>
@@ -36,6 +56,22 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
         _deviceEnumerator = deviceEnumerator;
         _policyConfig = policyConfig;
         _registryFallbackAction = registryFallbackAction;
+        _ownsEnumerator = false;
+
+        if (_deviceEnumerator != null)
+        {
+            try
+            {
+                int hr = _deviceEnumerator.RegisterEndpointNotificationCallback(this);
+                if (hr == 0)
+                {
+                    _isCallbackRegistered = true;
+                }
+            }
+            catch
+            {
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -442,4 +478,62 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider
 
     [GeneratedRegex(@"(?:\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", RegexOptions.RightToLeft)]
     private static partial Regex EndpointGuidRegex();
+
+    /// <inheritdoc/>
+    public void OnDeviceStateChanged(string pwstrDeviceId, DevicePresenceState dwNewState)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void OnDeviceAdded(string pwstrDeviceId)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void OnDeviceRemoved(string pwstrDeviceId)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void OnDefaultDeviceChanged(EDataFlow flow, ERole role, string pwstrDefaultDeviceId)
+    {
+        DefaultDeviceChanged?.Invoke(flow, role, pwstrDefaultDeviceId);
+    }
+
+    /// <inheritdoc/>
+    public void OnPropertyValueChanged(string pwstrDeviceId, PROPERTYKEY key)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        if (_deviceEnumerator != null)
+        {
+            if (_isCallbackRegistered)
+            {
+                try
+                {
+                    _deviceEnumerator.UnregisterEndpointNotificationCallback(this);
+                }
+                catch
+                {
+                }
+
+                _isCallbackRegistered = false;
+            }
+
+            if (_ownsEnumerator)
+            {
+                SafeReleaseComObject(_deviceEnumerator);
+            }
+        }
+    }
 }
