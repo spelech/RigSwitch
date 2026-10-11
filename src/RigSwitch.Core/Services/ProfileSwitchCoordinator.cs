@@ -390,20 +390,16 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         IEnumerable<AudioEndpointInfo> endpoints,
         IReadOnlyList<string>? blacklisted = null)
     {
+        if (string.IsNullOrWhiteSpace(primaryAudioId) && string.IsNullOrWhiteSpace(fallbackAudioId))
+        {
+            return null;
+        }
+
         var isPrimaryBlacklisted = blacklisted?.Any(b => MatchesEndpoint(b, primaryAudioId)) == true;
         var isFallbackBlacklisted = blacklisted?.Any(b => MatchesEndpoint(b, fallbackAudioId)) == true;
 
         var effectivePrimary = isPrimaryBlacklisted ? null : primaryAudioId;
         var effectiveFallback = isFallbackBlacklisted ? null : fallbackAudioId;
-
-        if (string.IsNullOrWhiteSpace(effectivePrimary) && string.IsNullOrWhiteSpace(effectiveFallback))
-        {
-            var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
-            var allowedList = blacklisted != null
-                ? endpointList.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList()
-                : endpointList;
-            return allowedList.FirstOrDefault(e => e.State == DevicePresenceState.Active)?.Id;
-        }
 
         var candidates = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
         var allowedCandidates = blacklisted != null
