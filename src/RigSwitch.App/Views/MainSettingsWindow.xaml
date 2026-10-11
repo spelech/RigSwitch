@@ -455,6 +455,19 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
+                    <TextBlock Text="Secondary Audio (Headset / Sonar):" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding SecondaryAudioId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Text="Fallback Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -509,6 +522,19 @@
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding PrimaryMicrophoneId, Mode=TwoWay}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="DisplayName" />
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Secondary Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValue="{Binding SecondaryMicrophoneId, Mode=TwoWay}"
                               SelectedValuePath="Id"
                               DisplayMemberPath="DisplayName" />
                 </Grid>
@@ -862,19 +888,30 @@
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <CheckBox Grid.Column="0"
                                                       IsChecked="{Binding IsVisible, Mode=TwoWay}"
                                                       VerticalAlignment="Center"
-                                                      Margin="0,0,14,0" />
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" />
-                                                <TextBlock Text="{Binding Adapter}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" />
-                                                <TextBlock Text="{Binding Id}" FontSize="10" Foreground="#55556E" Margin="0,1,0,0" />
+                                                      Margin="0,0,14,0"
+                                                      ToolTip="Toggle endpoint visibility in Windows audio menus" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
+                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Adapter}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Id}" FontSize="10" Foreground="#55556E" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
-                                            
+
+                                            <!-- Blacklist / Bass Shaker Exclusion Toggle -->
+                                            <CheckBox Grid.Column="2"
+                                                      Content="Exclude / Bass Shaker DAC"
+                                                      IsChecked="{Binding IsBlacklisted, Mode=TwoWay}"
+                                                      VerticalAlignment="Center"
+                                                      FontSize="12"
+                                                      Margin="0,0,16,0"
+                                                      ToolTip="Exclude this audio endpoint from profile routing (e.g. Bass Shaker / Buttkicker DAC)." />
+
                                             <!-- Presence State Badge -->
-                                            <Border Grid.Column="2"
+                                            <Border Grid.Column="3"
                                                     Background="{Binding StateBadgeBackground}"
                                                     BorderBrush="{Binding StateBadgeBorder}"
                                                     BorderThickness="1"
@@ -919,13 +956,21 @@
                                     <TextBlock Text="Direct Desk Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
                                     <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DeskHotkey, Mode=TwoWay}" />
                                 </Grid>
-                                <Grid>
+                                <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="220" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Direct Sim Rig Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
                                     <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding RigHotkey, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Toggle Audio (Speakers / Headset):" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding AudioToggleHotkey, Mode=TwoWay}" Watermark="None (Optional)" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -939,6 +984,9 @@
                                           Margin="0,0,0,12" />
                                 <CheckBox Content="Display balloon notifications when workstation profile switches"
                                           IsChecked="{Binding ShowToastNotifications, Mode=TwoWay}"
+                                          Margin="0,0,0,12" />
+                                <CheckBox Content="Actively enforce primary speakers against background hijacks (e.g. SteelSeries Sonar)"
+                                          IsChecked="{Binding EnforcePrimaryAudio, Mode=TwoWay}"
                                           Margin="0,0,0,12" />
                                 <CheckBox Content="Automatically check for updates on startup"
                                           IsChecked="{Binding EnableAutoUpdateCheck, Mode=TwoWay}"
