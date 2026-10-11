@@ -93,4 +93,72 @@ public sealed class PresetConfigurationItemViewModelTests
 
         Assert.Equal(PresetHdrMode.Disable, target.HdrMode);
     }
+
+    [Fact]
+    public void PresetConfigurationItemViewModel_BindsSecondaryAudioAndMicrophonePropertiesCorrectly()
+    {
+        var preset = new WorkstationPreset
+        {
+            PrimaryAudioId = "{SPK-1}",
+            SecondaryAudioId = "{HEADPHONES-1}",
+            PrimaryMicrophoneId = "{MIC-1}",
+            SecondaryMicrophoneId = "{HEADSET-MIC-1}"
+        };
+
+        var vm = new PresetConfigurationItemViewModel(preset, 0, "DeskGroup", true);
+
+        Assert.Equal("{SPK-1}", vm.PrimaryAudioId);
+        Assert.Equal("{HEADPHONES-1}", vm.SecondaryAudioId);
+        Assert.Equal("{MIC-1}", vm.PrimaryMicrophoneId);
+        Assert.Equal("{HEADSET-MIC-1}", vm.SecondaryMicrophoneId);
+
+        vm.SecondaryAudioId = "{NEW-SEC-AUDIO}";
+        vm.SecondaryMicrophoneId = "{NEW-SEC-MIC}";
+
+        var target = new WorkstationPreset();
+        vm.ApplyTo(target);
+
+        Assert.Equal("{NEW-SEC-AUDIO}", target.SecondaryAudioId);
+        Assert.Equal("{NEW-SEC-MIC}", target.SecondaryMicrophoneId);
+    }
+
+    [Fact]
+    public void PresetConfigurationItemViewModel_UpdateFrom_SynchronizesAllProperties()
+    {
+        var initial = new WorkstationPreset { Name = "Old Name" };
+        var vm = new PresetConfigurationItemViewModel(initial, 0, "DeskGroup", true);
+
+        var updated = new WorkstationPreset
+        {
+            Name = "New Racing Rig",
+            TargetMonitorId = "MON-RIG-1",
+            TargetMonitorIds = ["MON-RIG-1", "MON-RIG-2"],
+            PrimaryAudioId = "{RIG-SPK}",
+            SecondaryAudioId = "{RIG-HEADPHONES}",
+            FallbackAudioId = "{RIG-FALLBACK}",
+            PrimaryMicrophoneId = "{RIG-MIC}",
+            SecondaryMicrophoneId = "{RIG-HEADSET-MIC}",
+            FallbackMicrophoneId = "{RIG-FALLBACK-MIC}",
+            HdrMode = PresetHdrMode.Enable,
+            DirectHotkey = "Ctrl+Shift+1",
+            PlaybackVolume = new AudioVolumeSettings(PresetVolumeBehavior.Custom, 80, false),
+            MicrophoneVolume = new AudioVolumeSettings(PresetVolumeBehavior.Custom, 90, false)
+        };
+
+        vm.UpdateFrom(updated);
+
+        Assert.Equal("New Racing Rig", vm.Name);
+        Assert.Equal("MON-RIG-1", vm.TargetMonitorId);
+        Assert.Equal(["MON-RIG-1", "MON-RIG-2"], vm.TargetMonitorIds);
+        Assert.Equal("{RIG-SPK}", vm.PrimaryAudioId);
+        Assert.Equal("{RIG-HEADPHONES}", vm.SecondaryAudioId);
+        Assert.Equal("{RIG-FALLBACK}", vm.FallbackAudioId);
+        Assert.Equal("{RIG-MIC}", vm.PrimaryMicrophoneId);
+        Assert.Equal("{RIG-HEADSET-MIC}", vm.SecondaryMicrophoneId);
+        Assert.Equal("{RIG-FALLBACK-MIC}", vm.FallbackMicrophoneId);
+        Assert.Equal(PresetHdrMode.Enable, vm.HdrMode);
+        Assert.Equal("Ctrl+Shift+1", vm.DirectHotkey);
+        Assert.Equal(80, vm.PlaybackVolumePercent);
+        Assert.Equal(90, vm.MicrophoneVolumePercent);
+    }
 }

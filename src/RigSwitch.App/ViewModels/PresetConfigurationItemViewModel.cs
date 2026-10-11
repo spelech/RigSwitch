@@ -17,8 +17,10 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     private string _targetMonitorId;
     private List<string> _targetMonitorIds = [];
     private string _primaryAudioId;
+    private string _secondaryAudioId = string.Empty;
     private string _fallbackAudioId;
     private string _primaryMicrophoneId = string.Empty;
+    private string _secondaryMicrophoneId = string.Empty;
     private string _fallbackMicrophoneId = string.Empty;
     private PresetVolumeBehavior _playbackVolumeMode = PresetVolumeBehavior.Retain;
     private int _playbackVolumePercent = 50;
@@ -116,6 +118,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets or sets the secondary audio playback endpoint GUID identifier.
+    /// </summary>
+    public string SecondaryAudioId
+    {
+        get => _secondaryAudioId;
+        set => SetProperty(ref _secondaryAudioId, value);
+    }
+
+    /// <summary>
     /// Gets or sets the fallback audio playback endpoint GUID identifier.
     /// </summary>
     public string FallbackAudioId
@@ -131,6 +142,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     {
         get => _primaryMicrophoneId;
         set => SetProperty(ref _primaryMicrophoneId, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the secondary microphone / capture endpoint GUID identifier.
+    /// </summary>
+    public string SecondaryMicrophoneId
+    {
+        get => _secondaryMicrophoneId;
+        set => SetProperty(ref _secondaryMicrophoneId, value);
     }
 
     /// <summary>
@@ -294,8 +314,10 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         _targetMonitorIds = [.. preset.TargetMonitorIds];
         _targetMonitorId = preset.TargetMonitorId;
         _primaryAudioId = preset.PrimaryAudioId;
+        _secondaryAudioId = preset.SecondaryAudioId ?? string.Empty;
         _fallbackAudioId = preset.FallbackAudioId;
         _primaryMicrophoneId = preset.PrimaryMicrophoneId ?? string.Empty;
+        _secondaryMicrophoneId = preset.SecondaryMicrophoneId ?? string.Empty;
         _fallbackMicrophoneId = preset.FallbackMicrophoneId ?? string.Empty;
         _playbackVolumeMode = preset.PlaybackVolume?.Mode ?? PresetVolumeBehavior.Retain;
         _playbackVolumePercent = preset.PlaybackVolume?.VolumePercent ?? 50;
@@ -358,14 +380,50 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         target.TargetMonitorIds = [.. TargetMonitorIds];
         target.TargetMonitorId = TargetMonitorId;
         target.PrimaryAudioId = PrimaryAudioId;
+        target.SecondaryAudioId = SecondaryAudioId;
         target.FallbackAudioId = FallbackAudioId;
         target.PrimaryMicrophoneId = PrimaryMicrophoneId;
+        target.SecondaryMicrophoneId = SecondaryMicrophoneId;
         target.FallbackMicrophoneId = FallbackMicrophoneId;
         target.PlaybackVolume = new AudioVolumeSettings(PlaybackVolumeMode, PlaybackVolumePercent, PlaybackVolumeIsMuted);
         target.MicrophoneVolume = new AudioVolumeSettings(MicrophoneVolumeMode, MicrophoneVolumePercent, MicrophoneVolumeIsMuted);
         target.HdrMode = HdrMode;
         target.DirectHotkey = DirectHotkey;
         target.ApplicationHooks = ApplicationHooks.Select(h => h.ToModel()).ToList();
+    }
+
+    /// <summary>
+    /// Synchronizes this view model with the specified workstation preset record.
+    /// </summary>
+    /// <param name="preset">The source preset to read from.</param>
+    public void UpdateFrom(WorkstationPreset preset)
+    {
+        ArgumentNullException.ThrowIfNull(preset);
+        Name = preset.Name;
+        TargetMonitorIds = [.. preset.TargetMonitorIds];
+        TargetMonitorId = preset.TargetMonitorId;
+        PrimaryAudioId = preset.PrimaryAudioId;
+        SecondaryAudioId = preset.SecondaryAudioId ?? string.Empty;
+        FallbackAudioId = preset.FallbackAudioId;
+        PrimaryMicrophoneId = preset.PrimaryMicrophoneId ?? string.Empty;
+        SecondaryMicrophoneId = preset.SecondaryMicrophoneId ?? string.Empty;
+        FallbackMicrophoneId = preset.FallbackMicrophoneId ?? string.Empty;
+        PlaybackVolumeMode = preset.PlaybackVolume?.Mode ?? PresetVolumeBehavior.Retain;
+        PlaybackVolumePercent = preset.PlaybackVolume?.VolumePercent ?? 50;
+        PlaybackVolumeIsMuted = preset.PlaybackVolume?.IsMuted ?? false;
+        MicrophoneVolumeMode = preset.MicrophoneVolume?.Mode ?? PresetVolumeBehavior.Retain;
+        MicrophoneVolumePercent = preset.MicrophoneVolume?.VolumePercent ?? 50;
+        MicrophoneVolumeIsMuted = preset.MicrophoneVolume?.IsMuted ?? false;
+        HdrMode = preset.HdrMode;
+        DirectHotkey = preset.DirectHotkey;
+        ApplicationHooks.Clear();
+        if (preset.ApplicationHooks != null)
+        {
+            foreach (var hook in preset.ApplicationHooks)
+            {
+                ApplicationHooks.Add(new ApplicationHookItemViewModel(hook, RemoveApplicationHook));
+            }
+        }
     }
 
     private static void LaunchDisplaySettings()
