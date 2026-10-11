@@ -492,7 +492,19 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         });
         TryRegister(settings.DeskHotkey, () => _ = _coordinator.SwitchProfileAsync(ProfileMode.Desk));
         TryRegister(settings.RigHotkey, () => _ = _coordinator.SwitchProfileAsync(ProfileMode.SimRig));
-        TryRegister(settings.AudioToggleHotkey, () => _ = _coordinator.ToggleAudioOutputModeAsync());
+        TryRegister(settings.AudioToggleHotkey, () =>
+        {
+            var task = _coordinator.ToggleAudioOutputModeAsync();
+            _ = task.ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully)
+                {
+                    var mode = t.Result;
+                    _trayIconService.UpdateAudioState(mode);
+                    _trayIconService.ShowNotification("RigSwitch Audio", $"Switched audio output to {(mode == AudioOutputMode.Primary ? "Speakers" : "Headset")}.");
+                }
+            }, TaskScheduler.Default);
+        });
 
         for (int i = 0; i < settings.DeskPresets.Count; i++)
         {
