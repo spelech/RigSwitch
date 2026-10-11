@@ -25,6 +25,18 @@ public interface IProfileSwitchCoordinator
     WorkstationPreset CurrentPreset { get; }
 
     /// <summary>
+    /// Gets the currently active audio output destination mode.
+    /// </summary>
+    AudioOutputMode CurrentAudioOutputMode { get; }
+
+    /// <summary>
+    /// Toggles between Primary and Secondary audio output destinations and reapplies routing asynchronously.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>The newly active <see cref="AudioOutputMode"/>.</returns>
+    Task<AudioOutputMode> ToggleAudioOutputModeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Occurs when a profile switch operation finishes, indicating success or failure.
     /// </summary>
     event EventHandler<ProfileChangedEventArgs>? ProfileChanged;
