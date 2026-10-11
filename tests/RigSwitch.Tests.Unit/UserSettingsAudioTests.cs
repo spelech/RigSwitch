@@ -36,6 +36,7 @@ public sealed class UserSettingsAudioTests
             BlacklistedAudioEndpointIds = ["{DAC-1}", "{DAC-2}"]
         };
         original.DeskPresets[0].SecondaryAudioId = "{SONAR-HEADSET}";
+        original.DeskPresets[0].SecondaryMicrophoneId = "{BOOM-MIC}";
 
         var json = JsonSerializer.Serialize(original);
         var restored = JsonSerializer.Deserialize<UserSettings>(json);
@@ -46,5 +47,6 @@ public sealed class UserSettingsAudioTests
         Assert.Equal(AudioOutputMode.Secondary, restored.ActiveAudioOutputMode);
         Assert.Equal(["{DAC-1}", "{DAC-2}"], restored.BlacklistedAudioEndpointIds);
         Assert.Equal("{SONAR-HEADSET}", restored.DeskPresets[0].SecondaryAudioId);
+        Assert.Equal("{BOOM-MIC}", restored.DeskPresets[0].SecondaryMicrophoneId);
     }
 }

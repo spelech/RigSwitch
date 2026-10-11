@@ -503,6 +503,10 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     _trayIconService.UpdateAudioState(mode);
                     _trayIconService.ShowNotification("RigSwitch Audio", $"Switched audio output to {(mode == AudioOutputMode.Primary ? "Speakers" : "Headset")}.");
                 }
+                else if (t.IsFaulted)
+                {
+                    _trayIconService.ShowNotification("RigSwitch Audio Error", $"Failed to toggle audio output: {t.Exception?.GetBaseException().Message}");
+                }
             }, TaskScheduler.Default);
         });
 
