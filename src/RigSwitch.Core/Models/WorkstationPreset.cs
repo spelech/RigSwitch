@@ -64,6 +64,11 @@ public sealed record WorkstationPreset
     public string PrimaryAudioId { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the secondary audio endpoint device identifier.
+    /// </summary>
+    public string SecondaryAudioId { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the fallback audio endpoint device identifier.
     /// </summary>
     public string FallbackAudioId { get; set; } = string.Empty;
@@ -72,6 +77,11 @@ public sealed record WorkstationPreset
     /// Gets or sets the primary microphone / capture endpoint device identifier.
     /// </summary>
     public string PrimaryMicrophoneId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the secondary microphone / capture endpoint device identifier.
+    /// </summary>
+    public string SecondaryMicrophoneId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the fallback microphone / capture endpoint device identifier.

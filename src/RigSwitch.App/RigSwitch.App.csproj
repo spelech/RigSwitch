@@ -13,6 +13,10 @@
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\app.png" />
+    <Resource Include="Assets\desk.ico" />
+    <Resource Include="Assets\simrig.ico" />
+    <Resource Include="Assets\desk.png" />
+    <Resource Include="Assets\simrig.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RigSwitch.Core\RigSwitch.Core.csproj" />

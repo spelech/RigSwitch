@@ -1,0 +1,515 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ========================================================================= -->
+    <!-- Windows 11 Fluent Eye-Comfort Palette (Warm Charcoal, Amber & Sage)       -->
+    <!-- ========================================================================= -->
+
+    <!-- Base Surface Brushes -->
+    <SolidColorBrush x:Key="MutedCharcoalBg" Color="#1C1D1F" />
+    <SolidColorBrush x:Key="SlateSidebarBg" Color="#141517" />
+    <SolidColorBrush x:Key="HeaderFooterBg" Color="#141517" />
+    <SolidColorBrush x:Key="HeaderFooterBorder" Color="#2A2B2F" />
+
+    <!-- Card & Interactive Surface Brushes -->
+    <SolidColorBrush x:Key="GraphiteCardBg" Color="#26272B" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#33353D" />
+    <SolidColorBrush x:Key="CardHoverBg" Color="#2E3036" />
+
+    <!-- Typography Brushes -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E4E8" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#9CA3AF" />
+
+    <!-- Accent Brushes: Soft Sage Green (Desk) & Warm Honey Amber (Sim Rig) -->
+    <SolidColorBrush x:Key="AccentDesk" Color="#10B981" />
+    <SolidColorBrush x:Key="AccentRig" Color="#F59E0B" />
+
+    <!-- Form Control Brushes -->
+    <SolidColorBrush x:Key="ControlInputBg" Color="#313338" />
+    <SolidColorBrush x:Key="ControlBorder" Color="#44474F" />
+
+    <!-- Aliases for backwards and flexible theme compatibility -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#E2E4E8" />
+    <SolidColorBrush x:Key="TextMuted" Color="#9CA3AF" />
+    <SolidColorBrush x:Key="AccentGreen" Color="#10B981" />
+    <SolidColorBrush x:Key="AccentOrange" Color="#F59E0B" />
+
+    <!-- ========================================================================= -->
+    <!-- Control Styles                                                            -->
+    <!-- ========================================================================= -->
+
+    <!-- Fluent Pill Toggle Switch Style for CheckBox -->
+    <Style x:Key="FluentToggleSwitch" TargetType="{x:Type CheckBox}">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type CheckBox}">
+                    <Grid Background="Transparent" SnapsToDevicePixels="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="SwitchTrack"
+                                Grid.Column="0"
+                                Width="48"
+                                Height="26"
+                                CornerRadius="13"
+                                Background="{StaticResource ControlInputBg}"
+                                BorderBrush="{StaticResource ControlBorder}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Border x:Name="SwitchThumb"
+                                    Width="20"
+                                    Height="20"
+                                    CornerRadius="10"
+                                    Background="#FFFFFF"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Margin="3,0,0,0" />
+                        </Border>
+                        <ContentPresenter x:Name="SwitchContent"
+                                          Grid.Column="1"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="10,0,0,0"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="SwitchTrack" Property="Background" Value="{StaticResource AccentDesk}" />
+                            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource AccentDesk}" />
+                            <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="SwitchThumb" Property="Margin" Value="0,0,3,0" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#636674" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.9" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.4" />
+                            <Setter TargetName="SwitchContent" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                        <Trigger Property="HasContent" Value="False">
+                            <Setter TargetName="SwitchContent" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="SwitchContent" Property="Margin" Value="0" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent Pill Toggle Switch Style with Warm Amber Rig Accent -->
+    <Style x:Key="FluentToggleSwitchRig" TargetType="{x:Type CheckBox}" BasedOn="{StaticResource FluentToggleSwitch}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type CheckBox}">
+                    <Grid Background="Transparent" SnapsToDevicePixels="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="SwitchTrack"
+                                Grid.Column="0"
+                                Width="48"
+                                Height="26"
+                                CornerRadius="13"
+                                Background="{StaticResource ControlInputBg}"
+                                BorderBrush="{StaticResource ControlBorder}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Border x:Name="SwitchThumb"
+                                    Width="20"
+                                    Height="20"
+                                    CornerRadius="10"
+                                    Background="#FFFFFF"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Margin="3,0,0,0" />
+                        </Border>
+                        <ContentPresenter x:Name="SwitchContent"
+                                          Grid.Column="1"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="10,0,0,0"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="SwitchTrack" Property="Background" Value="{StaticResource AccentRig}" />
+                            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource AccentRig}" />
+                            <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="SwitchThumb" Property="Margin" Value="0,0,3,0" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#636674" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.9" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.4" />
+                            <Setter TargetName="SwitchContent" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                        <Trigger Property="HasContent" Value="False">
+                            <Setter TargetName="SwitchContent" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="SwitchContent" Property="Margin" Value="0" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Elevated Setting Card Style for Border -->
+    <Style x:Key="FluentSettingCard" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource GraphiteCardBg}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="16,18" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- Fluent Rounded TextBox Style -->
+    <Style x:Key="FluentTextBox" TargetType="{x:Type TextBox}">
+        <Setter Property="Background" Value="{StaticResource ControlInputBg}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="CaretBrush" Value="{StaticResource AccentDesk}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource AccentDesk}" />
+        <Setter Property="SelectionOpacity" Value="0.4" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TextBox}">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Focusable="False"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Hidden"
+                                      Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="#5A5D68" />
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentDesk}" />
+                            <Setter TargetName="border" Property="Background" Value="#24262A" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent Refined Button Style -->
+    <Style x:Key="FluentButton" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="#2E3036" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="7"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Focusable="False"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#383A42" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#5A5D68" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#24252A" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#44474F" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent Accent Action Button Style (e.g. Save Settings, Desk/Rig switch) -->
+    <Style x:Key="FluentActionButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentButton}">
+        <Setter Property="Background" Value="{StaticResource AccentRig}" />
+        <Setter Property="Foreground" Value="#000000" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="18,8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="7"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Focusable="False"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.9" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.75" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent Navigation Sidebar RadioButton Style -->
+    <Style x:Key="FluentNavButton" TargetType="{x:Type RadioButton}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+        <Setter Property="FontSize" Value="14.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RadioButton}">
+                    <Border x:Name="navBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="12,0"
+                            Margin="0,2"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <Border x:Name="activeIndicator"
+                                    Width="3.5"
+                                    Height="18"
+                                    CornerRadius="1.75"
+                                    Background="{StaticResource AccentDesk}"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed" />
+                            <ContentPresenter HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Margin="10,0,0,0"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="navBorder" Property="Background" Value="#222327" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="navBorder" Property="Background" Value="#28292E" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                            <Setter TargetName="activeIndicator" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent ComboBox Dropdown ToggleButton Style -->
+    <Style x:Key="FluentComboBoxToggleButtonStyle" TargetType="{x:Type ToggleButton}">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="ClickMode" Value="Press" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Border x:Name="templateRoot"
+                            Background="{StaticResource ControlInputBg}"
+                            BorderBrush="{StaticResource ControlBorder}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            SnapsToDevicePixels="True">
+                        <Border x:Name="splitBorder"
+                                Width="26"
+                                HorizontalAlignment="Right"
+                                Margin="0"
+                                SnapsToDevicePixels="True">
+                            <Path x:Name="arrow"
+                                  Data="M 0,0 L 4,4 L 8,0"
+                                  Stroke="{StaticResource TextMutedBrush}"
+                                  StrokeThickness="1.5"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center" />
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="templateRoot" Property="BorderBrush" Value="#5A5D68" />
+                            <Setter TargetName="arrow" Property="Stroke" Value="{StaticResource TextPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="templateRoot" Property="BorderBrush" Value="{StaticResource AccentDesk}" />
+                            <Setter TargetName="arrow" Property="Stroke" Value="{StaticResource AccentDesk}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="templateRoot" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent ComboBoxItem Style -->
+    <Style x:Key="FluentComboBoxItem" TargetType="{x:Type ComboBoxItem}">
+        <Setter Property="Background" Value="{StaticResource ControlInputBg}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="Transparent"
+                            BorderThickness="0"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}"
+                            Margin="2,1"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#3D4048" />
+                            <Setter Property="Foreground" Value="#FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#1A3B30" />
+                            <Setter Property="Foreground" Value="{StaticResource AccentDesk}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fluent ComboBox Style -->
+    <Style x:Key="FluentComboBox" TargetType="{x:Type ComboBox}">
+        <Setter Property="Background" Value="{StaticResource ControlInputBg}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="ItemContainerStyle" Value="{StaticResource FluentComboBoxItem}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ComboBox}">
+                    <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
+                        <ToggleButton x:Name="toggleButton"
+                                      Style="{StaticResource FluentComboBoxToggleButtonStyle}"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                        <ContentPresenter x:Name="contentPresenter"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"
+                                          IsHitTestVisible="False" />
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               Placement="Bottom"
+                               PopupAnimation="Slide">
+                            <Border x:Name="dropDownBorder"
+                                    Background="{StaticResource ControlInputBg}"
+                                    BorderBrush="{StaticResource ControlBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="2"
+                                    MinWidth="{Binding ActualWidth, ElementName=templateRoot}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <ScrollViewer x:Name="dropDownScrollViewer">
+                                    <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="HasItems" Value="False">
+                            <Setter TargetName="dropDownBorder" Property="Height" Value="95" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="templateRoot" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

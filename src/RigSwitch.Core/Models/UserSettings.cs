@@ -228,6 +228,26 @@ public sealed record UserSettings
     public List<string> HiddenAudioEndpointIds { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets the list of audio endpoint GUID identifiers excluded from default audio routing (e.g. bass shaker DACs).
+    /// </summary>
+    public List<string> BlacklistedAudioEndpointIds { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the hotkey combination used to toggle between primary and secondary audio endpoints.
+    /// </summary>
+    public string AudioToggleHotkey { get; set; } = "Ctrl+Alt+A";
+
+    /// <summary>
+    /// Gets or sets a value indicating whether primary audio is strictly enforced upon profile activation.
+    /// </summary>
+    public bool EnforcePrimaryAudio { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the active audio output destination mode.
+    /// </summary>
+    public AudioOutputMode ActiveAudioOutputMode { get; set; } = AudioOutputMode.Primary;
+
+    /// <summary>
     /// Gets or sets the hotkey combination used to toggle between Desk and Sim Rig profiles.
     /// </summary>
     public string ToggleHotkey { get; set; } = "Ctrl+Alt+S";
@@ -302,4 +322,20 @@ public sealed record UserSettings
 
         return (idx >= 0 && idx < list.Count) ? list[idx] : list[0];
     }
+}
+
+/// <summary>
+/// Specifies the audio output destination mode (primary speakers vs secondary headset or virtual device).
+/// </summary>
+public enum AudioOutputMode
+{
+    /// <summary>
+    /// Routes playback and capture to the primary audio endpoints.
+    /// </summary>
+    Primary = 0,
+
+    /// <summary>
+    /// Routes playback and capture to the secondary audio endpoints.
+    /// </summary>
+    Secondary = 1,
 }

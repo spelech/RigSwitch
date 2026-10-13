@@ -47,4 +47,9 @@ public interface INativeAudioProvider
     /// <param name="endpointId">The endpoint device identifier.</param>
     /// <returns>A tuple of volume scalar level (0.0f to 1.0f) and mute state.</returns>
     (float ScalarLevel, bool IsMuted) GetEndpointVolume(string endpointId);
+
+    /// <summary>
+    /// Occurs when the default audio endpoint changes for a given data flow and role.
+    /// </summary>
+    event Action<EDataFlow, ERole, string>? DefaultDeviceChanged;
 }

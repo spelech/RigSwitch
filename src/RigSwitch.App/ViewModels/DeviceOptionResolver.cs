@@ -36,6 +36,35 @@ internal static partial class DeviceOptionResolver
     }
 
     /// <summary>
+    /// Filters out audio endpoints whose identifiers match any of the blacklisted identifiers.
+    /// </summary>
+    /// <param name="endpoints">The collection of audio endpoints to filter.</param>
+    /// <param name="blacklistedIds">The collection of blacklisted endpoint identifiers.</param>
+    /// <returns>A list of audio endpoints that are not blacklisted.</returns>
+    public static IReadOnlyList<AudioEndpointInfo> FilterBlacklistedEndpoints(
+        IEnumerable<AudioEndpointInfo>? endpoints,
+        IEnumerable<string>? blacklistedIds)
+    {
+        if (endpoints == null)
+        {
+            return [];
+        }
+
+        var blacklist = blacklistedIds?
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToList();
+
+        if (blacklist == null || blacklist.Count == 0)
+        {
+            return endpoints.ToList();
+        }
+
+        return endpoints
+            .Where(ep => !blacklist.Any(bId => MatchesEndpoint(bId, ep.Id)))
+            .ToList();
+    }
+
+    /// <summary>
     /// Filters an audio endpoint item based on search text and presence state filter selection.
     /// </summary>
     public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection)

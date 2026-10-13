@@ -39,11 +39,14 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     private string _toggleHotkey = "Ctrl+Alt+S";
     private string _deskHotkey = "Ctrl+Alt+D";
     private string _rigHotkey = "Ctrl+Alt+R";
+    private string _audioToggleHotkey = "Ctrl+Alt+A";
+    private bool _enforcePrimaryAudio = true;
     private bool _startMinimizedToTray = true;
     private bool _showToastNotifications = true;
     private bool _enableAutoUpdateCheck = true;
     private string _ignoredReleaseVersion = string.Empty;
     private bool _disposed;
+    private List<AudioEndpointInfo> _cachedRawAudioEndpoints = [];
 
     public ObservableCollection<DisplayDeviceInfo> DetectedDisplays { get; } = [];
     public ObservableCollection<AudioEndpointInfo> DetectedAudioEndpoints { get; } = [];
@@ -120,6 +123,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public string ToggleHotkey { get => _toggleHotkey; set => SetProperty(ref _toggleHotkey, value); }
     public string DeskHotkey { get => _deskHotkey; set => SetProperty(ref _deskHotkey, value); }
     public string RigHotkey { get => _rigHotkey; set => SetProperty(ref _rigHotkey, value); }
+    public string AudioToggleHotkey { get => _audioToggleHotkey; set => SetProperty(ref _audioToggleHotkey, value); }
+    public bool EnforcePrimaryAudio { get => _enforcePrimaryAudio; set => SetProperty(ref _enforcePrimaryAudio, value); }
 
     public bool StartMinimizedToTray { get => _startMinimizedToTray; set => SetProperty(ref _startMinimizedToTray, value); }
     public bool ShowToastNotifications { get => _showToastNotifications; set => SetProperty(ref _showToastNotifications, value); }
@@ -194,6 +199,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             ToggleHotkey = _settings.ToggleHotkey;
             DeskHotkey = _settings.DeskHotkey;
             RigHotkey = _settings.RigHotkey;
+            AudioToggleHotkey = _settings.AudioToggleHotkey;
+            EnforcePrimaryAudio = _settings.EnforcePrimaryAudio;
 
             StartMinimizedToTray = _settings.StartMinimizedToTray;
             ShowToastNotifications = _settings.ShowToastNotifications;
@@ -212,6 +219,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             }
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
+            _cachedRawAudioEndpoints = [.. audioEndpoints];
             DetectedAudioEndpoints.Clear();
             foreach (var a in audioEndpoints)
             {
@@ -234,23 +242,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 AvailableDisplayOptions.Add(new DeviceSelectionOption(d.MonitorId, label));
             }
 
-            AvailableAudioOptions.Clear();
-            AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
-            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Playback))
-            {
-                string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
-                var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
-                AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
-            }
-
-            AvailableMicrophoneOptions.Clear();
-            AvailableMicrophoneOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Microphone (Unassigned / System Default) —"));
-            foreach (var a in audioEndpoints.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Capture))
-            {
-                string customNick = _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty);
-                var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
-                AvailableMicrophoneOptions.Add(new DeviceSelectionOption(a.Id, name));
-            }
+            PopulateAudioSelectionOptions(_cachedRawAudioEndpoints);
 
             DeviceOptionResolver.EnsureDisplayOption(DeskMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
             DeviceOptionResolver.EnsureDisplayOption(RigMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
@@ -265,8 +257,10 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 var preset = _settings.DeskPresets[i];
                 DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.SecondaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.SecondaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.PrimaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.SecondaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.SecondaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 DeskPresets.Add(new PresetConfigurationItemViewModel(preset, i, "DeskActivePreset", i == _settings.ActiveDeskPresetIndex, OnDeskPresetActivated));
             }
@@ -277,8 +271,10 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 var preset = _settings.RigPresets[i];
                 DeviceOptionResolver.EnsureDisplayOption(preset.TargetMonitorId, AvailableDisplayOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.PrimaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.SecondaryAudioId = DeviceOptionResolver.ResolveAudioOption(preset.SecondaryAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackAudioId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackAudioId, audioEndpoints, AvailableAudioOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.PrimaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
+                preset.SecondaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.SecondaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 RigPresets.Add(new PresetConfigurationItemViewModel(preset, i, "RigActivePreset", i == _settings.ActiveRigPresetIndex, OnRigPresetActivated));
             }
@@ -308,10 +304,20 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
             AudioEndpointsVisibility.Clear();
             var hiddenList = _settings.HiddenAudioEndpointIds;
+            var blacklistedList = _settings.BlacklistedAudioEndpointIds;
             foreach (var a in audioEndpoints)
             {
                 bool isVisible = !hiddenList.Any(hId => DeviceOptionResolver.MatchesEndpoint(hId, a.Id));
-                AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(a.Id, a.Name, a.AdapterDescription, isVisible, OnAudioVisibilityChangedAsync, a.State));
+                bool isBlacklisted = blacklistedList.Any(bId => DeviceOptionResolver.MatchesEndpoint(bId, a.Id));
+                AudioEndpointsVisibility.Add(new AudioEndpointVisibilityItemViewModel(
+                    a.Id,
+                    a.Name,
+                    a.AdapterDescription,
+                    isVisible,
+                    OnAudioVisibilityChangedAsync,
+                    a.State,
+                    isBlacklisted,
+                    OnAudioBlacklistChangedAsync));
             }
 
             PopulateMonitorTiles(displays, _settings);
@@ -379,6 +385,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             settings.ToggleHotkey = ToggleHotkey;
             settings.DeskHotkey = DeskHotkey;
             settings.RigHotkey = RigHotkey;
+            settings.AudioToggleHotkey = AudioToggleHotkey;
+            settings.EnforcePrimaryAudio = EnforcePrimaryAudio;
 
             settings.StartMinimizedToTray = StartMinimizedToTray;
             settings.ShowToastNotifications = ShowToastNotifications;
@@ -484,6 +492,23 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         });
         TryRegister(settings.DeskHotkey, () => _ = _coordinator.SwitchProfileAsync(ProfileMode.Desk));
         TryRegister(settings.RigHotkey, () => _ = _coordinator.SwitchProfileAsync(ProfileMode.SimRig));
+        TryRegister(settings.AudioToggleHotkey, () =>
+        {
+            var task = _coordinator.ToggleAudioOutputModeAsync();
+            _ = task.ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully)
+                {
+                    var mode = t.Result;
+                    _trayIconService.UpdateAudioState(mode);
+                    _trayIconService.ShowNotification("RigSwitch Audio", $"Switched audio output to {(mode == AudioOutputMode.Primary ? "Speakers" : "Headset")}.");
+                }
+                else if (t.IsFaulted)
+                {
+                    _trayIconService.ShowNotification("RigSwitch Audio Error", $"Failed to toggle audio output: {t.Exception?.GetBaseException().Message}");
+                }
+            }, TaskScheduler.Default);
+        });
 
         for (int i = 0; i < settings.DeskPresets.Count; i++)
         {
@@ -499,6 +524,29 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
         if (failedHotkeys.Count > 0)
             StatusMessage = $"Warning: Failed to register hotkey(s): {string.Join(", ", failedHotkeys)}";
+    }
+
+    private void PopulateAudioSelectionOptions(IEnumerable<AudioEndpointInfo> endpoints)
+    {
+        var nonBlacklisted = DeviceOptionResolver.FilterBlacklistedEndpoints(endpoints, _settings?.BlacklistedAudioEndpointIds ?? []);
+
+        AvailableAudioOptions.Clear();
+        AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
+        foreach (var a in nonBlacklisted.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Playback))
+        {
+            string customNick = _settings?.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty) ?? string.Empty;
+            var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+            AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
+        }
+
+        AvailableMicrophoneOptions.Clear();
+        AvailableMicrophoneOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Microphone (Unassigned / System Default) —"));
+        foreach (var a in nonBlacklisted.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Capture))
+        {
+            string customNick = _settings?.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty) ?? string.Empty;
+            var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+            AvailableMicrophoneOptions.Add(new DeviceSelectionOption(a.Id, name));
+        }
     }
 
     private void OnDeskPresetActivated(PresetConfigurationItemViewModel activated)
@@ -531,6 +579,36 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         {
             item.RevertVisibility(!isVisible);
             StatusMessage = $"Failed to update visibility for {item.Name}: {ex.Message}";
+        }
+    }
+
+    private async Task OnAudioBlacklistChangedAsync(AudioEndpointVisibilityItemViewModel item, bool isBlacklisted)
+    {
+        try
+        {
+            if (_settings != null)
+            {
+                if (isBlacklisted)
+                {
+                    if (!_settings.BlacklistedAudioEndpointIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id)))
+                    {
+                        _settings.BlacklistedAudioEndpointIds.Add(item.Id);
+                    }
+                }
+                else
+                {
+                    _settings.BlacklistedAudioEndpointIds.RemoveAll(id => DeviceOptionResolver.MatchesEndpoint(id, item.Id));
+                }
+
+                await _settingsStorage.SaveSettingsAsync(_settings);
+                PopulateAudioSelectionOptions(_cachedRawAudioEndpoints);
+            }
+            StatusMessage = $"Audio endpoint '{item.Name}' {(isBlacklisted ? "blacklisted (excluded from routing)" : "removed from blacklist")}.";
+        }
+        catch (Exception ex)
+        {
+            item.RevertBlacklisted(!isBlacklisted);
+            StatusMessage = $"Failed to update blacklist for {item.Name}: {ex.Message}";
         }
     }
 

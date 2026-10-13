@@ -9,6 +9,7 @@ using RigSwitch.App.ViewModels;
 using RigSwitch.App.Views;
 using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
+using RigSwitch.Core.Models;
 using RigSwitch.Core.Services;
 using RigSwitch.Infrastructure.Services;
 using RigSwitch.Infrastructure.Storage;
@@ -43,7 +44,9 @@ public partial class App : Application
 
             builder.Services.AddSingleton<ISettingsStorageService>(_ => new JsonSettingsStorageService());
             builder.Services.AddSingleton<IDisplayConfigurationService>(_ => new WindowsDisplayConfigurationService());
-            builder.Services.AddSingleton<IAudioEndpointDirector>(_ => new CoreAudioEndpointDirector());
+            builder.Services.AddSingleton<INativeAudioProvider>(_ => new WindowsNativeAudioProvider());
+            builder.Services.AddSingleton<IAudioEndpointDirector>(sp => new CoreAudioEndpointDirector(sp.GetRequiredService<INativeAudioProvider>()));
+            builder.Services.AddSingleton<IAudioEndpointWatchdogService, AudioEndpointWatchdogService>();
             builder.Services.AddSingleton<IGlobalHotkeyService>(_ => new WindowsGlobalHotkeyService());
             builder.Services.AddSingleton<IApplicationLifecycleHookService>(_ => new WindowsApplicationLifecycleHookService());
             builder.Services.AddSingleton<IUpdateCheckService>(_ => new UpdateCheckService());
@@ -66,6 +69,9 @@ public partial class App : Application
             var viewModel = _host.Services.GetRequiredService<MainSettingsViewModel>();
             _mainWindow = _host.Services.GetRequiredService<MainSettingsWindow>();
             _trayIconService = _host.Services.GetRequiredService<TrayIconService>();
+
+            var watchdog = _host.Services.GetRequiredService<IAudioEndpointWatchdogService>();
+            watchdog.Start();
 
             _trayIconService.Initialize(ShowSettingsWindow, settingsStorage);
 
@@ -113,6 +119,15 @@ public partial class App : Application
                 {
                     if (args.Success)
                     {
+                        var activePreset = args.ActivePreset;
+                        var audioTarget = coordinator.CurrentAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(activePreset?.SecondaryAudioId)
+                            ? activePreset?.SecondaryAudioId
+                            : activePreset?.PrimaryAudioId;
+                        if (!string.IsNullOrWhiteSpace(audioTarget))
+                        {
+                            watchdog.NotifyIntentionalSwitch(audioTarget);
+                        }
+
                         _trayIconService.UpdateTrayState(args.NewProfile, args.ActivePreset);
                         _trayIconService.ShowNotification("RigSwitch", $"Switched to {args.NewProfile} setup [{args.ActivePreset?.Name ?? "Default"}].");
                     }
@@ -185,6 +200,10 @@ public partial class App : Application
             _mainWindow.SetExplicitShutdown();
             _mainWindow.Close();
         }
+
+        var watchdog = _host?.Services.GetService<IAudioEndpointWatchdogService>();
+        watchdog?.Stop();
+        watchdog?.Dispose();
 
         var hotkeyService = _host?.Services.GetService<IGlobalHotkeyService>();
         hotkeyService?.UnregisterAll();
