@@ -61,7 +61,14 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public string AudioSearchText
     {
         get => _audioSearchText;
-        set { if (SetProperty(ref _audioSearchText, value)) FilteredAudioEndpoints?.Refresh(); }
+        set
+        {
+            if (SetProperty(ref _audioSearchText, value))
+            {
+                FilteredAudioEndpoints?.Refresh();
+                OnPropertyChanged(nameof(FilterStatusSummary));
+            }
+        }
     }
 
     private string _audioFilterSelection = "All";
@@ -76,13 +83,79 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(IsAllFilterSelected));
                 OnPropertyChanged(nameof(IsActiveFilterSelected));
                 OnPropertyChanged(nameof(IsInactiveFilterSelected));
+                OnPropertyChanged(nameof(FilterStatusSummary));
             }
         }
     }
 
-    public bool IsAllFilterSelected => string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase);
-    public bool IsActiveFilterSelected => string.Equals(AudioFilterSelection, "Active", StringComparison.OrdinalIgnoreCase);
-    public bool IsInactiveFilterSelected => string.Equals(AudioFilterSelection, "Inactive", StringComparison.OrdinalIgnoreCase);
+    public bool IsAllFilterSelected
+    {
+        get => string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value)
+            {
+                AudioFilterSelection = "All";
+            }
+        }
+    }
+
+    public bool IsActiveFilterSelected
+    {
+        get => string.Equals(AudioFilterSelection, "Active", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value)
+            {
+                AudioFilterSelection = "Active";
+            }
+        }
+    }
+
+    public bool IsInactiveFilterSelected
+    {
+        get => string.Equals(AudioFilterSelection, "Inactive", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(AudioFilterSelection, "Disabled / Unplugged", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(AudioFilterSelection, "Unplugged", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(AudioFilterSelection, "Disabled", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value)
+            {
+                AudioFilterSelection = "Inactive";
+            }
+        }
+    }
+
+    public string FilterStatusSummary
+    {
+        get
+        {
+            int total = AudioEndpointsVisibility.Count;
+            int active = AudioEndpointsVisibility.Count(e => e.State == RigSwitch.Core.Enums.DevicePresenceState.Active);
+            int inactive = AudioEndpointsVisibility.Count(e => e.State != RigSwitch.Core.Enums.DevicePresenceState.Active);
+
+            string modeLabel = IsActiveFilterSelected
+                ? "Active Only"
+                : IsInactiveFilterSelected
+                    ? "Disabled / Unplugged"
+                    : "All Devices";
+
+            int matchingCount = IsActiveFilterSelected
+                ? active
+                : IsInactiveFilterSelected
+                    ? inactive
+                    : total;
+
+            if (!string.IsNullOrWhiteSpace(AudioSearchText))
+            {
+                int searchMatches = AudioEndpointsVisibility.Count(e => MatchesAudioFilter(e, AudioSearchText, AudioFilterSelection));
+                return $"Showing {modeLabel} • {searchMatches} of {total} endpoints matching \"{AudioSearchText}\"";
+            }
+
+            return $"Showing {modeLabel} • {matchingCount} of {total} endpoints";
+        }
+    }
 
     public ICommand SelectAllAudioFilterCommand { get; }
     public ICommand SelectActiveAudioFilterCommand { get; }
@@ -319,6 +392,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     isBlacklisted,
                     OnAudioBlacklistChangedAsync));
             }
+            OnPropertyChanged(nameof(FilterStatusSummary));
 
             PopulateMonitorTiles(displays, _settings);
 
