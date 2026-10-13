@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using RigSwitch.App.Services;
 using RigSwitch.App.ViewModels;
 using RigSwitch.App.Views;
@@ -67,6 +68,10 @@ public partial class App : Application
             }
 
             var builder = Host.CreateApplicationBuilder(e.Args);
+            if (isCli)
+            {
+                builder.Logging.ClearProviders();
+            }
 
             builder.Services.AddSingleton<ISettingsStorageService>(_ => new JsonSettingsStorageService());
             builder.Services.AddSingleton<IDisplayConfigurationService>(_ => new WindowsDisplayConfigurationService());
