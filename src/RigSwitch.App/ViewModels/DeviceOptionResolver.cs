@@ -79,7 +79,14 @@ internal static partial class DeviceOptionResolver
         if (string.Equals(filterSelection, "Active", StringComparison.OrdinalIgnoreCase))
             return item.State == DevicePresenceState.Active;
 
-        if (string.Equals(filterSelection, "Inactive", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(filterSelection, "Disabled", StringComparison.OrdinalIgnoreCase))
+            return item.State == DevicePresenceState.Disabled;
+
+        if (string.Equals(filterSelection, "Unplugged", StringComparison.OrdinalIgnoreCase))
+            return item.State == DevicePresenceState.Unplugged || item.State == DevicePresenceState.NotPresent;
+
+        if (string.Equals(filterSelection, "Inactive", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filterSelection, "Disabled / Unplugged", StringComparison.OrdinalIgnoreCase))
             return item.State != DevicePresenceState.Active;
 
         return true;

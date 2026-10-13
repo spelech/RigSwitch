@@ -28,6 +28,9 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
     private bool _isRunning;
     private bool _disposed;
 
+    /// <inheritdoc/>
+    public bool IsRunning => _isRunning;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioEndpointWatchdogService"/> class.
     /// </summary>

@@ -1,8 +1,11 @@
 namespace RigSwitch.App.Views;
 
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using RigSwitch.App.ViewModels;
 
 /// <summary>
@@ -66,6 +69,83 @@ public partial class MainSettingsWindow : Window
         }
 
         base.OnClosing(e);
+    }
+
+    /// <summary>
+    /// Captures a screenshot of the specified settings view tab and writes it to disk as a PNG.
+    /// </summary>
+    /// <param name="viewName">The name of the view tab ('presets', 'displays', 'audio', 'nicknames', 'hotkeys').</param>
+    /// <param name="requestedPath">The optional destination file path.</param>
+    /// <returns>The absolute path of the saved PNG file.</returns>
+    public async Task<string> CaptureScreenshotAsync(string? viewName, string? requestedPath = null)
+    {
+        return await Dispatcher.InvokeAsync(() =>
+        {
+            int tabIndex = (viewName?.ToLowerInvariant().Trim()) switch
+            {
+                "displays" => 1,
+                "audio" => 2,
+                "nicknames" => 3,
+                "hotkeys" => 4,
+                _ => 0
+            };
+
+            if (ContentTabControl != null)
+            {
+                ContentTabControl.SelectedIndex = tabIndex;
+            }
+
+            var effectiveView = (viewName?.ToLowerInvariant().Trim()) switch
+            {
+                "displays" => "displays",
+                "audio" => "audio",
+                "nicknames" => "nicknames",
+                "hotkeys" => "hotkeys",
+                _ => "presets"
+            };
+
+            string outPath = !string.IsNullOrWhiteSpace(requestedPath)
+                ? requestedPath
+                : Path.Combine(Path.GetTempPath(), $"rigswitch-{effectiveView}.png");
+
+            var dir = Path.GetDirectoryName(Path.GetFullPath(outPath));
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            if (WindowState == WindowState.Minimized)
+            {
+                WindowState = WindowState.Normal;
+            }
+
+            int width = (int)ActualWidth;
+            int height = (int)ActualHeight;
+            if (width <= 0) width = (int)Width;
+            if (height <= 0) height = (int)Height;
+            if (width <= 0) width = 960;
+            if (height <= 0) height = 700;
+
+            if (ActualWidth <= 0 || ActualHeight <= 0)
+            {
+                Measure(new Size(width, height));
+                Arrange(new Rect(0, 0, width, height));
+            }
+            UpdateLayout();
+
+            var renderTarget = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            renderTarget.Render(this);
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(renderTarget));
+
+            using (var stream = File.Create(outPath))
+            {
+                encoder.Save(stream);
+            }
+
+            return Path.GetFullPath(outPath);
+        });
     }
 
     private void NavButton_Checked(object sender, RoutedEventArgs e)

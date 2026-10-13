@@ -1,9 +1,12 @@
 namespace RigSwitch.App;
 
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using RigSwitch.App.Services;
 using RigSwitch.App.ViewModels;
 using RigSwitch.App.Views;
@@ -11,6 +14,7 @@ using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Models;
 using RigSwitch.Core.Services;
+using RigSwitch.Infrastructure.Ipc;
 using RigSwitch.Infrastructure.Services;
 using RigSwitch.Infrastructure.Storage;
 using RigSwitch.Infrastructure.Windows.Ccd;
@@ -25,6 +29,12 @@ using Application = System.Windows.Application;
 /// </summary>
 public partial class App : Application
 {
+    private const int ATTACH_PARENT_PROCESS = -1;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachConsole(int dwProcessId);
+
     private IHost? _host;
     private TrayIconService? _trayIconService;
     private MainSettingsWindow? _mainWindow;
@@ -38,9 +48,30 @@ public partial class App : Application
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            WinForms.Application.EnableVisualStyles();
+            bool isCli = e.Args.Length > 0 &&
+                !e.Args.Any(a => a.Equals("--minimized", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--tray", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--settings", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--show", StringComparison.OrdinalIgnoreCase));
+
+            if (isCli)
+            {
+                AttachConsole(ATTACH_PARENT_PROCESS);
+                var stdOut = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true };
+                Console.SetOut(stdOut);
+                var stdError = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+                Console.SetError(stdError);
+            }
+            else
+            {
+                WinForms.Application.EnableVisualStyles();
+            }
 
             var builder = Host.CreateApplicationBuilder(e.Args);
+            if (isCli)
+            {
+                builder.Logging.ClearProviders();
+            }
 
             builder.Services.AddSingleton<ISettingsStorageService>(_ => new JsonSettingsStorageService());
             builder.Services.AddSingleton<IDisplayConfigurationService>(_ => new WindowsDisplayConfigurationService());
@@ -61,8 +92,28 @@ public partial class App : Application
             builder.Services.AddSingleton<MainSettingsViewModel>();
             builder.Services.AddSingleton<MainSettingsWindow>();
 
+            builder.Services.AddSingleton<IIpcServer>(_ => new NamedPipeIpcServer());
+            builder.Services.AddSingleton<IIpcClient>(_ => new NamedPipeIpcClient());
+            builder.Services.AddSingleton<IpcCommandHandler>(sp =>
+                new IpcCommandHandler(
+                    sp.GetRequiredService<IProfileSwitchCoordinator>(),
+                    sp.GetRequiredService<ISettingsStorageService>(),
+                    sp.GetRequiredService<IAudioEndpointWatchdogService>(),
+                    sp.GetRequiredService<IDisplayConfigurationService>(),
+                    sp.GetRequiredService<IAudioEndpointDirector>(),
+                    (view, path) => sp.GetRequiredService<MainSettingsWindow>().CaptureScreenshotAsync(view, path)));
+            builder.Services.AddSingleton<CliController>();
+
             _host = builder.Build();
             await _host.StartAsync();
+
+            if (isCli)
+            {
+                var cliController = _host.Services.GetRequiredService<CliController>();
+                int exitCode = await cliController.RunAsync(e.Args);
+                Shutdown(exitCode);
+                return;
+            }
 
             var settingsStorage = _host.Services.GetRequiredService<ISettingsStorageService>();
             var coordinator = _host.Services.GetRequiredService<IProfileSwitchCoordinator>();
@@ -72,6 +123,19 @@ public partial class App : Application
 
             var watchdog = _host.Services.GetRequiredService<IAudioEndpointWatchdogService>();
             watchdog.Start();
+
+            var ipcServer = _host.Services.GetRequiredService<IIpcServer>();
+            var commandHandler = _host.Services.GetRequiredService<IpcCommandHandler>();
+            ipcServer.RegisterHandler(req => commandHandler.HandleRequestAsync(req));
+
+            try
+            {
+                await ipcServer.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Failed to start IPC server: {ex.Message}");
+            }
 
             _trayIconService.Initialize(ShowSettingsWindow, settingsStorage);
 
@@ -209,6 +273,20 @@ public partial class App : Application
         hotkeyService?.UnregisterAll();
 
         _trayIconService?.Dispose();
+
+        var ipcServer = _host?.Services.GetService<IIpcServer>();
+        if (ipcServer != null)
+        {
+            try
+            {
+                ipcServer.StopAsync().GetAwaiter().GetResult();
+                ipcServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Error stopping IPC server: {ex.Message}");
+            }
+        }
 
         _host?.StopAsync().GetAwaiter().GetResult();
         _host?.Dispose();
