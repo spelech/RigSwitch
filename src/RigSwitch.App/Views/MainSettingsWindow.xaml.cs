@@ -126,8 +126,11 @@ public partial class MainSettingsWindow : Window
             if (width <= 0) width = 960;
             if (height <= 0) height = 700;
 
-            Measure(new Size(width, height));
-            Arrange(new Rect(0, 0, width, height));
+            if (ActualWidth <= 0 || ActualHeight <= 0)
+            {
+                Measure(new Size(width, height));
+                Arrange(new Rect(0, 0, width, height));
+            }
             UpdateLayout();
 
             var renderTarget = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
