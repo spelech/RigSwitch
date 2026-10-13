@@ -1,5 +1,7 @@
 namespace RigSwitch.App;
 
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +28,12 @@ using Application = System.Windows.Application;
 /// </summary>
 public partial class App : Application
 {
+    private const int ATTACH_PARENT_PROCESS = -1;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachConsole(int dwProcessId);
+
     private IHost? _host;
     private TrayIconService? _trayIconService;
     private MainSettingsWindow? _mainWindow;
@@ -39,7 +47,24 @@ public partial class App : Application
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            WinForms.Application.EnableVisualStyles();
+            bool isCli = e.Args.Length > 0 &&
+                !e.Args.Any(a => a.Equals("--minimized", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--tray", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--settings", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--show", StringComparison.OrdinalIgnoreCase));
+
+            if (isCli)
+            {
+                AttachConsole(ATTACH_PARENT_PROCESS);
+                var stdOut = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true };
+                Console.SetOut(stdOut);
+                var stdError = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
+                Console.SetError(stdError);
+            }
+            else
+            {
+                WinForms.Application.EnableVisualStyles();
+            }
 
             var builder = Host.CreateApplicationBuilder(e.Args);
 
@@ -63,6 +88,7 @@ public partial class App : Application
             builder.Services.AddSingleton<MainSettingsWindow>();
 
             builder.Services.AddSingleton<IIpcServer>(_ => new NamedPipeIpcServer());
+            builder.Services.AddSingleton<IIpcClient>(_ => new NamedPipeIpcClient());
             builder.Services.AddSingleton<IpcCommandHandler>(sp =>
                 new IpcCommandHandler(
                     sp.GetRequiredService<IProfileSwitchCoordinator>(),
@@ -71,9 +97,18 @@ public partial class App : Application
                     sp.GetRequiredService<IDisplayConfigurationService>(),
                     sp.GetRequiredService<IAudioEndpointDirector>(),
                     (view, path) => sp.GetRequiredService<MainSettingsWindow>().CaptureScreenshotAsync(view, path)));
+            builder.Services.AddSingleton<CliController>();
 
             _host = builder.Build();
             await _host.StartAsync();
+
+            if (isCli)
+            {
+                var cliController = _host.Services.GetRequiredService<CliController>();
+                int exitCode = await cliController.RunAsync(e.Args);
+                Shutdown(exitCode);
+                return;
+            }
 
             var settingsStorage = _host.Services.GetRequiredService<ISettingsStorageService>();
             var coordinator = _host.Services.GetRequiredService<IProfileSwitchCoordinator>();
