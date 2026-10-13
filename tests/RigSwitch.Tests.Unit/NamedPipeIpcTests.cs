@@ -294,5 +294,18 @@ public sealed class NamedPipeIpcTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             client.IsServerRunningAsync(TimeSpan.FromSeconds(2), cts.Token));
     }
+
+    [Fact]
+    public async Task DisposeAsync_WithoutExplicitStop_StopsServerAndSetsIsRunningFalse()
+    {
+        var pipeName = CreateUniquePipeName();
+        var server = new NamedPipeIpcServer(pipeName);
+
+        await server.StartAsync();
+        Assert.True(server.IsRunning);
+
+        await server.DisposeAsync();
+        Assert.False(server.IsRunning);
+    }
 }
 

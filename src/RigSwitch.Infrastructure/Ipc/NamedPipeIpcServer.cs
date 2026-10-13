@@ -269,8 +269,8 @@ public sealed class NamedPipeIpcServer : IIpcServer
             return;
         }
 
-        _disposed = true;
         await StopAsync().ConfigureAwait(false);
+        _disposed = true;
         _stateLock.Dispose();
     }
 }
