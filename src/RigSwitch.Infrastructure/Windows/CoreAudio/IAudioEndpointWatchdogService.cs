@@ -7,6 +7,11 @@ namespace RigSwitch.Infrastructure.Windows.CoreAudio;
 public interface IAudioEndpointWatchdogService : IDisposable
 {
     /// <summary>
+    /// Gets a value indicating whether the watchdog service is actively running.
+    /// </summary>
+    bool IsRunning { get; }
+
+    /// <summary>
     /// Starts monitoring default audio endpoint changes.
     /// </summary>
     void Start();

@@ -11,6 +11,7 @@ using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Models;
 using RigSwitch.Core.Services;
+using RigSwitch.Infrastructure.Ipc;
 using RigSwitch.Infrastructure.Services;
 using RigSwitch.Infrastructure.Storage;
 using RigSwitch.Infrastructure.Windows.Ccd;
@@ -61,6 +62,16 @@ public partial class App : Application
             builder.Services.AddSingleton<MainSettingsViewModel>();
             builder.Services.AddSingleton<MainSettingsWindow>();
 
+            builder.Services.AddSingleton<IIpcServer>(_ => new NamedPipeIpcServer());
+            builder.Services.AddSingleton<IpcCommandHandler>(sp =>
+                new IpcCommandHandler(
+                    sp.GetRequiredService<IProfileSwitchCoordinator>(),
+                    sp.GetRequiredService<ISettingsStorageService>(),
+                    sp.GetRequiredService<IAudioEndpointWatchdogService>(),
+                    sp.GetRequiredService<IDisplayConfigurationService>(),
+                    sp.GetRequiredService<IAudioEndpointDirector>(),
+                    (view, path) => sp.GetRequiredService<MainSettingsWindow>().CaptureScreenshotAsync(view, path)));
+
             _host = builder.Build();
             await _host.StartAsync();
 
@@ -72,6 +83,19 @@ public partial class App : Application
 
             var watchdog = _host.Services.GetRequiredService<IAudioEndpointWatchdogService>();
             watchdog.Start();
+
+            var ipcServer = _host.Services.GetRequiredService<IIpcServer>();
+            var commandHandler = _host.Services.GetRequiredService<IpcCommandHandler>();
+            ipcServer.RegisterHandler(req => commandHandler.HandleRequestAsync(req));
+
+            try
+            {
+                await ipcServer.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Failed to start IPC server: {ex.Message}");
+            }
 
             _trayIconService.Initialize(ShowSettingsWindow, settingsStorage);
 
@@ -209,6 +233,20 @@ public partial class App : Application
         hotkeyService?.UnregisterAll();
 
         _trayIconService?.Dispose();
+
+        var ipcServer = _host?.Services.GetService<IIpcServer>();
+        if (ipcServer != null)
+        {
+            try
+            {
+                ipcServer.StopAsync().GetAwaiter().GetResult();
+                ipcServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Error stopping IPC server: {ex.Message}");
+            }
+        }
 
         _host?.StopAsync().GetAwaiter().GetResult();
         _host?.Dispose();
