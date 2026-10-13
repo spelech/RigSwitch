@@ -84,30 +84,39 @@ public sealed class UiScreenshotCaptureTests
 
             var window = new MainSettingsWindow(vm)
             {
-                Width = 800,
-                Height = 640
+                Width = 960,
+                Height = 700
             };
 
             var outDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "docs", "screenshots");
             System.IO.Directory.CreateDirectory(outDir);
 
             window.Show();
-            window.UpdateLayout();
-            SaveWindowToPng(window, System.IO.Path.Combine(outDir, "profiles_tab.png"));
-
-            // 2. Switch to Device Nicknames Tab (index 1)
-            var tabControl = FindVisualChild<TabControl>(window);
-            if (tabControl != null)
+            
+            void CaptureView(int index, string filename)
             {
-                tabControl.SelectedIndex = 1;
+                window.ContentTabControl.SelectedIndex = index;
+                window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+                window.Measure(new Size(960, 700));
+                window.Arrange(new Rect(0, 0, 960, 700));
                 window.UpdateLayout();
-                SaveWindowToPng(window, System.IO.Path.Combine(outDir, "nicknames_tab.png"));
-
-                // 3. Switch to Audio Cleanup Tab (index 2)
-                tabControl.SelectedIndex = 2;
-                window.UpdateLayout();
-                SaveWindowToPng(window, System.IO.Path.Combine(outDir, "audio_cleanup_tab.png"));
+                SaveWindowToPng(window, System.IO.Path.Combine(outDir, filename));
             }
+
+            // 1. Presets View
+            CaptureView(0, "01_presets_view.png");
+
+            // 2. Displays & Topology View
+            CaptureView(1, "02_displays_topology_view.png");
+
+            // 3. Audio & DAC Lockout View (with Bass Shakers)
+            CaptureView(2, "03_audio_dac_lockout_view.png");
+
+            // 4. Device Nicknames View
+            CaptureView(3, "04_device_nicknames_view.png");
+
+            // 5. Hotkeys & System View
+            CaptureView(4, "05_hotkeys_and_system_view.png");
 
             window.SetExplicitShutdown();
             window.Close();

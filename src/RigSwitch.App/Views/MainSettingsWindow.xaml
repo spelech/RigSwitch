@@ -8,9 +8,9 @@
         xmlns:enums="clr-namespace:RigSwitch.Core.Enums;assembly=RigSwitch.Core"
         mc:Ignorable="d"
         Title="RigSwitch — Workstation &amp; Sim Rig Hardware Controller"
-        Width="880"
-        Height="680"
-        MinWidth="800"
+        Width="960"
+        Height="700"
+        MinWidth="860"
         MinHeight="580"
         SizeToContent="Manual"
         WindowStartupLocation="CenterScreen"
@@ -348,7 +348,7 @@
                             <TextBlock Text="Target Display &amp; Windows HDR" FontSize="15.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock Text="Designate the target display and choose whether Windows HDR (Advanced Color) is retained, enabled, or disabled." FontSize="13.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Width="330">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Width="300">
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -388,7 +388,7 @@
                             <TextBlock Text="Default sound playback device for desktop speakers, soundbar, or direct DAC output." FontSize="13.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Grid.Column="1"
-                                  Width="330"
+                                  Width="300"
                                   VerticalAlignment="Center"
                                   ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                   SelectedValue="{Binding PrimaryAudioId, Mode=TwoWay}"
@@ -409,7 +409,7 @@
                             <TextBlock Text="Secondary playback destination for wireless headsets, VR audio, or gaming communications." FontSize="13.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Grid.Column="1"
-                                  Width="330"
+                                  Width="300"
                                   VerticalAlignment="Center"
                                   ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                   SelectedValue="{Binding SecondaryAudioId, Mode=TwoWay}"
@@ -430,7 +430,7 @@
                             <TextBlock Text="Backup playback device automatically activated if the primary audio device is unplugged or offline." FontSize="13.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Grid.Column="1"
-                                  Width="330"
+                                  Width="300"
                                   VerticalAlignment="Center"
                                   ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                   SelectedValue="{Binding FallbackAudioId, Mode=TwoWay}"
@@ -450,7 +450,7 @@
                             <TextBlock Text="Playback Volume &amp; Mute" FontSize="15.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock Text="Configure default volume behavior, set a fixed level, or toggle output mute upon profile switch." FontSize="13.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Width="330">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Width="300">
                             <ComboBox SelectedValue="{Binding PlaybackVolumeMode, Mode=TwoWay}"
                                       SelectedValuePath="Tag"
                                       Margin="0,0,0,8">
@@ -491,7 +491,7 @@
                             <TextBlock Text="Microphones &amp; Input Levels" FontSize="15.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock Text="Assign primary, secondary, and fallback voice input devices, and configure capture levels." FontSize="13.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Width="330">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Width="300">
                             <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="72" />
