@@ -997,27 +997,21 @@
                                     Background="#141517"
                                     BorderBrush="{StaticResource CardBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="8"
+                                    CornerRadius="9"
                                     Padding="3"
                                     VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
-                                    <RadioButton Content="All Devices"
-                                                 GroupName="AudioStatusFilterGroup"
-                                                 IsChecked="{Binding IsAllFilterSelected, Mode=TwoWay}"
-                                                 Command="{Binding SelectAllAudioFilterCommand}"
-                                                 Style="{StaticResource FluentFilterSegment}"
-                                                 Margin="0,0,2,0" />
-                                    <RadioButton Content="Active Only"
-                                                 GroupName="AudioStatusFilterGroup"
-                                                 IsChecked="{Binding IsActiveFilterSelected, Mode=TwoWay}"
-                                                 Command="{Binding SelectActiveAudioFilterCommand}"
-                                                 Style="{StaticResource FluentFilterSegmentActive}"
-                                                 Margin="0,0,2,0" />
-                                    <RadioButton Content="Disabled / Unplugged"
-                                                 GroupName="AudioStatusFilterGroup"
-                                                 IsChecked="{Binding IsInactiveFilterSelected, Mode=TwoWay}"
-                                                 Command="{Binding SelectInactiveAudioFilterCommand}"
-                                                 Style="{StaticResource FluentFilterSegmentInactive}" />
+                                    <Button Content="All Devices"
+                                            Command="{Binding SelectAllAudioFilterCommand}"
+                                            Style="{StaticResource FluentFilterAllButton}"
+                                            Margin="0,0,4,0" />
+                                    <Button Content="Active Only"
+                                            Command="{Binding SelectActiveAudioFilterCommand}"
+                                            Style="{StaticResource FluentFilterActiveButton}"
+                                            Margin="0,0,4,0" />
+                                    <Button Content="Disabled / Unplugged"
+                                            Command="{Binding SelectInactiveAudioFilterCommand}"
+                                            Style="{StaticResource FluentFilterInactiveButton}" />
                                 </StackPanel>
                             </Border>
                         </Grid>

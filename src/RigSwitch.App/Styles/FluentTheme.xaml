@@ -516,44 +516,40 @@
     <!-- Fluent Segmented Filter Styles (All, Active Only, Disabled / Unplugged)   -->
     <!-- ========================================================================= -->
 
-    <!-- Base / Neutral Segment (All Devices) -->
-    <Style x:Key="FluentFilterSegment" TargetType="{x:Type RadioButton}">
-        <Setter Property="Background" Value="Transparent" />
+    <!-- Base Segment Filter Button -->
+    <Style x:Key="FluentSegmentFilterButton" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="#212226" />
         <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="16,7" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Padding" Value="14,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="{x:Type RadioButton}">
-                    <Border x:Name="segBorder"
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="border"
                             Background="{TemplateBinding Background}"
-                            BorderBrush="Transparent"
-                            BorderThickness="1"
-                            CornerRadius="6"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="7"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
+                                          Focusable="False"
                                           RecognizesAccessKey="True" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="segBorder" Property="Background" Value="#2A2B30" />
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="segBorder" Property="Background" Value="#383A42" />
-                            <Setter TargetName="segBorder" Property="BorderBrush" Value="#5A5D68" />
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                            <Setter Property="FontWeight" Value="Bold" />
+                            <Setter TargetName="border" Property="Background" Value="#2E3037" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#4B4E58" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="segBorder" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="border" Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -561,76 +557,43 @@
         </Setter>
     </Style>
 
-    <!-- Active Only Segment (Soft Sage Tint & Desk Accent Glow) -->
-    <Style x:Key="FluentFilterSegmentActive" TargetType="{x:Type RadioButton}" BasedOn="{StaticResource FluentFilterSegment}">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type RadioButton}">
-                    <Border x:Name="segBorder"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="Transparent"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="{TemplateBinding Padding}"
-                            SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"
-                                          RecognizesAccessKey="True" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="segBorder" Property="Background" Value="#152B1E" />
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="segBorder" Property="Background" Value="#102D1E" />
-                            <Setter TargetName="segBorder" Property="BorderBrush" Value="{StaticResource AccentDesk}" />
-                            <Setter Property="Foreground" Value="{StaticResource AccentDesk}" />
-                            <Setter Property="FontWeight" Value="Bold" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="segBorder" Property="Opacity" Value="0.45" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+    <!-- All Devices Filter Button Style (High Contrast Crisp Slate Highlight) -->
+    <Style x:Key="FluentFilterAllButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentSegmentFilterButton}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsAllFilterSelected}" Value="True">
+                <Setter Property="Background" Value="#444752" />
+                <Setter Property="BorderBrush" Value="#7A8092" />
+                <Setter Property="BorderThickness" Value="1.5" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
-    <!-- Disabled / Unplugged Segment (Warm Amber Tint & Sim Rig Accent Glow) -->
-    <Style x:Key="FluentFilterSegmentInactive" TargetType="{x:Type RadioButton}" BasedOn="{StaticResource FluentFilterSegment}">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type RadioButton}">
-                    <Border x:Name="segBorder"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="Transparent"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="{TemplateBinding Padding}"
-                            SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"
-                                          RecognizesAccessKey="True" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="segBorder" Property="Background" Value="#2D2314" />
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="segBorder" Property="Background" Value="#38260D" />
-                            <Setter TargetName="segBorder" Property="BorderBrush" Value="{StaticResource AccentRig}" />
-                            <Setter Property="Foreground" Value="{StaticResource AccentRig}" />
-                            <Setter Property="FontWeight" Value="Bold" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="segBorder" Property="Opacity" Value="0.45" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+    <!-- Active Only Filter Button Style (Vibrant Sage Green Glow) -->
+    <Style x:Key="FluentFilterActiveButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentSegmentFilterButton}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsActiveFilterSelected}" Value="True">
+                <Setter Property="Background" Value="{StaticResource AccentDesk}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AccentDesk}" />
+                <Setter Property="BorderThickness" Value="1.5" />
+                <Setter Property="Foreground" Value="#000000" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Disabled / Unplugged Filter Button Style (Vibrant Honey Amber Glow) -->
+    <Style x:Key="FluentFilterInactiveButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentSegmentFilterButton}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsInactiveFilterSelected}" Value="True">
+                <Setter Property="Background" Value="{StaticResource AccentRig}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AccentRig}" />
+                <Setter Property="BorderThickness" Value="1.5" />
+                <Setter Property="Foreground" Value="#000000" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
 </ResourceDictionary>
