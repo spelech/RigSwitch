@@ -8,247 +8,65 @@
         xmlns:enums="clr-namespace:RigSwitch.Core.Enums;assembly=RigSwitch.Core"
         mc:Ignorable="d"
         Title="RigSwitch — Workstation &amp; Sim Rig Hardware Controller"
-        Width="780"
-        Height="620"
-        MinWidth="700"
-        MinHeight="540"
+        Width="880"
+        Height="680"
+        MinWidth="800"
+        MinHeight="580"
         SizeToContent="Manual"
         WindowStartupLocation="CenterScreen"
-        Background="#000000"
-        Foreground="#FFFFFF"
-        FontFamily="Segoe UI Variable Text, Segoe UI, sans-serif"
+        Background="{StaticResource MutedCharcoalBg}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="Bahnschrift, Segoe UI Variable Display, Segoe UI, sans-serif"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
         d:DataContext="{d:DesignInstance Type=vm:MainSettingsViewModel}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <!-- Pure Pitch-Black OLED & High-Contrast Telemetry Palette -->
-        <SolidColorBrush x:Key="OledBaseBg" Color="#000000" />
-        <SolidColorBrush x:Key="OledControlBg" Color="#08080C" />
-        <SolidColorBrush x:Key="OledBorder" Color="#262634" />
-        <SolidColorBrush x:Key="OledBorderBright" Color="#3A3A4E" />
-        
-        <!-- Deep Luminous Emerald Green & Molten Racing Orange -->
-        <SolidColorBrush x:Key="AccentGreen" Color="#00C853" />
-        <SolidColorBrush x:Key="AccentOrange" Color="#FF5500" />
-        <SolidColorBrush x:Key="AccentRig" Color="#FF5500" />
-        <SolidColorBrush x:Key="AccentDesk" Color="#00C853" />
-        <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="TextMuted" Color="#8E95A5" />
+
+        <!-- Palette Aliases for Warm Charcoal Theme -->
+        <SolidColorBrush x:Key="OledBaseBg" Color="#1C1D1F" />
+        <SolidColorBrush x:Key="OledControlBg" Color="#26272B" />
+        <SolidColorBrush x:Key="OledBorder" Color="#2A2B2F" />
+        <SolidColorBrush x:Key="OledBorderBright" Color="#33353D" />
+
+        <SolidColorBrush x:Key="TextPrimary" Color="#E2E4E8" />
+        <SolidColorBrush x:Key="TextMuted" Color="#9CA3AF" />
+        <SolidColorBrush x:Key="AccentGreen" Color="#10B981" />
+        <SolidColorBrush x:Key="AccentOrange" Color="#F59E0B" />
 
         <!-- Base Styles -->
         <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="FontSize" Value="13" />
         </Style>
 
-        <!-- High-Contrast Pure Pitch-Black TextBox Style with explicit ControlTemplate -->
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#0A0A0F" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource OledBorderBright}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="CaretBrush" Value="{StaticResource AccentGreen}" />
-            <Setter Property="SelectionBrush" Value="#00C853" />
-            <Setter Property="SelectionOpacity" Value="0.4" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="border"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
-                                SnapsToDevicePixels="True">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Focusable="False"
-                                          HorizontalScrollBarVisibility="Hidden"
-                                          VerticalScrollBarVisibility="Hidden"
-                                          Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="#555577" />
-                            </Trigger>
-                            <Trigger Property="IsFocused" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentGreen}" />
-                                <Setter TargetName="border" Property="Background" Value="#000000" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="border" Property="Opacity" Value="0.56" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- ComboBox ToggleButton Style -->
-        <Style x:Key="ComboBoxToggleButtonStyle" TargetType="ToggleButton">
-            <Setter Property="OverridesDefaultStyle" Value="True" />
-            <Setter Property="IsTabStop" Value="False" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="ClickMode" Value="Press" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="templateRoot"
-                                Background="#0A0A0F"
-                                BorderBrush="{StaticResource OledBorderBright}"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                SnapsToDevicePixels="True">
-                            <Border x:Name="splitBorder"
-                                    Width="24"
-                                    HorizontalAlignment="Right"
-                                    Margin="0"
-                                    SnapsToDevicePixels="True">
-                                <Path x:Name="arrow"
-                                      Data="F1 M 0,0 L 2.667,2.667 L 5.333,0 Z"
-                                      Fill="#8E95A5"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center" />
-                            </Border>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="templateRoot" Property="BorderBrush" Value="#555577" />
-                                <Setter TargetName="arrow" Property="Fill" Value="#FFFFFF" />
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="templateRoot" Property="BorderBrush" Value="{StaticResource AccentGreen}" />
-                                <Setter TargetName="arrow" Property="Fill" Value="{StaticResource AccentGreen}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="templateRoot" Property="Opacity" Value="0.5" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- High-Contrast ComboBoxItem Style -->
-        <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#0A0A0F" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="Transparent"
-                                BorderThickness="0"
-                                Padding="{TemplateBinding Padding}"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1A1A28" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#0D2818" />
-                                <Setter Property="Foreground" Value="#00E676" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- High-Contrast ComboBox Style -->
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#0A0A0F" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource OledBorderBright}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBox">
-                        <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
-                            <ToggleButton x:Name="toggleButton"
-                                          Style="{StaticResource ComboBoxToggleButtonStyle}"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
-                            <ContentPresenter x:Name="contentPresenter"
-                                              Content="{TemplateBinding SelectionBoxItem}"
-                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
-                                              HorizontalAlignment="Left"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}"
-                                              IsHitTestVisible="False" />
-                            <Popup x:Name="PART_Popup"
-                                   AllowsTransparency="True"
-                                   IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
-                                   Placement="Bottom"
-                                   PopupAnimation="Slide">
-                                <Border x:Name="dropDownBorder"
-                                        Background="#0A0A0F"
-                                        BorderBrush="{StaticResource OledBorderBright}"
-                                        BorderThickness="1"
-                                        CornerRadius="4"
-                                        MinWidth="{Binding ActualWidth, ElementName=templateRoot}"
-                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <ScrollViewer x:Name="dropDownScrollViewer">
-                                        <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Border>
-                            </Popup>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="HasItems" Value="False">
-                                <Setter TargetName="dropDownBorder" Property="Height" Value="95" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="templateRoot" Property="Opacity" Value="0.56" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource FluentTextBox}" />
+        <Style TargetType="ComboBox" BasedOn="{StaticResource FluentComboBox}" />
 
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#101016" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
-            <Setter Property="BorderBrush" Value="{StaticResource OledBorderBright}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="14,7" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource FluentButton}" />
 
-        <Style x:Key="AccentSaveButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#FF5500" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+        <Style x:Key="AccentSaveButtonStyle" TargetType="Button" BasedOn="{StaticResource FluentActionButton}">
+            <Setter Property="Background" Value="{StaticResource AccentDesk}" />
+            <Setter Property="Foreground" Value="#141517" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="18,8" />
+            <Setter Property="Padding" Value="22,8" />
         </Style>
 
         <!-- Monitor Tile Template for Drag-and-Drop / Pile Management -->
         <DataTemplate x:Key="MonitorTileTemplate" DataType="{x:Type vm:DisplayMonitorTileViewModel}">
             <Border x:Name="TileBorder"
-                    Background="#050508"
-                    BorderBrush="{StaticResource OledBorderBright}"
+                    Background="{StaticResource GraphiteCardBg}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="12"
@@ -264,8 +82,8 @@
                     <!-- Tile Header Badge -->
                     <Border x:Name="HeaderBadge"
                             Grid.Row="0"
-                            Background="#0A0A10"
-                            BorderBrush="{StaticResource AccentGreen}"
+                            Background="#182A22"
+                            BorderBrush="{StaticResource AccentDesk}"
                             BorderThickness="1.5"
                             CornerRadius="6"
                             Padding="8,4"
@@ -274,20 +92,21 @@
                         <TextBlock x:Name="HeaderText"
                                    Text="{Binding DisplayNumber, StringFormat='Monitor {0}'}"
                                    FontWeight="ExtraBold"
-                                   FontSize="16"
-                                   Foreground="{StaticResource AccentGreen}" />
+                                   FontSize="15"
+                                   Foreground="{StaticResource AccentDesk}" />
                     </Border>
 
                     <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,8">
                         <TextBlock Text="{Binding FriendlyName}"
                                    FontWeight="Bold"
                                    FontSize="12"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
                                    TextAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
                                    MaxWidth="140" />
                         <TextBlock Text="{Binding MonitorId}"
                                    FontSize="10"
-                                   Foreground="{StaticResource TextMuted}"
+                                   Foreground="{StaticResource TextMutedBrush}"
                                    TextAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
                                    MaxWidth="140" />
@@ -295,13 +114,13 @@
                                    Text="Offline / Disconnected"
                                    FontSize="10"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF8888"
+                                   Foreground="#F87171"
                                    TextAlignment="Center"
                                    Visibility="Collapsed"
                                    Margin="0,2,0,0" />
-                        <Border Background="#121224" BorderBrush="#00E5FF" BorderThickness="1" CornerRadius="3" Padding="5,1" Margin="0,3,0,0" HorizontalAlignment="Center"
+                        <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="3" Padding="5,1" Margin="0,3,0,0" HorizontalAlignment="Center"
                                 Visibility="{Binding HasHdrBadge, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="{Binding HdrBadgeText}" FontSize="9" FontWeight="Bold" Foreground="#00E5FF" />
+                            <TextBlock Text="{Binding HdrBadgeText}" FontSize="9" FontWeight="Bold" Foreground="#38BDF8" />
                         </Border>
                     </StackPanel>
 
@@ -318,44 +137,38 @@
                                 Padding="4,2"
                                 FontSize="10"
                                 Margin="1"
-                                BorderBrush="{StaticResource AccentGreen}"
+                                BorderBrush="{StaticResource AccentDesk}"
                                 ToolTip="Assign to Desk Profile" />
                         <Button Content="Rig"
                                 Command="{Binding MoveToRigCommand}"
                                 Padding="4,2"
                                 FontSize="10"
                                 Margin="1"
-                                BorderBrush="{StaticResource AccentOrange}"
+                                BorderBrush="{StaticResource AccentRig}"
                                 ToolTip="Assign to Sim Rig Profile" />
                     </UniformGrid>
                 </Grid>
             </Border>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsActive}" Value="False">
-                    <Setter TargetName="TileBorder" Property="Opacity" Value="0.75" />
-                    <Setter TargetName="HeaderBadge" Property="BorderBrush" Value="#555577" />
-                    <Setter TargetName="HeaderText" Property="Foreground" Value="#8E95A5" />
+                    <Setter TargetName="TileBorder" Property="Opacity" Value="0.65" />
+                    <Setter TargetName="HeaderBadge" Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                    <Setter TargetName="HeaderText" Property="Foreground" Value="{StaticResource TextMutedBrush}" />
                     <Setter TargetName="OfflineStatusText" Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
 
-        <!-- Modern Motorsport Tab Styling -->
-        <Style TargetType="TabControl">
-            <Setter Property="Background" Value="{StaticResource OledBaseBg}" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
-        </Style>
-
-        <Style TargetType="TabItem">
+        <!-- Inner Presets Sub-Tab Styling -->
+        <Style x:Key="SubTabItemStyle" TargetType="TabItem">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="TabBorder"
-                                Background="#000000"
-                                BorderBrush="{StaticResource OledBorder}"
-                                BorderThickness="0,0,1,2"
-                                Padding="18,12"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0,0,0,2"
+                                Padding="16,8"
                                 Cursor="Hand">
                             <ContentPresenter ContentSource="Header"
                                               HorizontalAlignment="Center"
@@ -363,14 +176,12 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="#0A0A10" />
-                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,0,1,2" />
-                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentDesk}" />
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                                 <Setter Property="FontWeight" Value="Bold" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="False">
-                                <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -378,9 +189,16 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SubTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource SubTabItemStyle}" />
+        </Style>
+
         <!-- Preset Header & Detail Templates -->
         <DataTemplate x:Key="PresetHeaderTemplate" DataType="{x:Type vm:PresetConfigurationItemViewModel}">
-            <TextBlock Text="{Binding Header}" FontSize="12" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Header}" FontSize="12.5" FontWeight="SemiBold" />
         </DataTemplate>
 
         <DataTemplate x:Key="PresetDetailTemplate" DataType="{x:Type vm:PresetConfigurationItemViewModel}">
@@ -389,7 +207,7 @@
                              IsChecked="{Binding IsActive, Mode=TwoWay}"
                              GroupName="{Binding GroupName}"
                              FontWeight="Bold"
-                             Foreground="{StaticResource AccentGreen}"
+                             Foreground="{StaticResource AccentDesk}"
                              Margin="0,0,0,14" />
 
                 <Grid Margin="0,0,0,10">
@@ -397,7 +215,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Preset Name:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Preset Name:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <TextBox Grid.Column="1" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
 
@@ -407,7 +225,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Target Display:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Target Display:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableDisplayOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding TargetMonitorId, Mode=TwoWay}"
@@ -427,7 +245,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Windows HDR (Color):" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Windows HDR (Color):" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               SelectedValue="{Binding HdrMode, Mode=TwoWay}"
                               SelectedValuePath="Tag">
@@ -442,7 +260,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Primary Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Primary Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding PrimaryAudioId, Mode=TwoWay}"
@@ -455,7 +273,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Secondary Audio (Headset / Sonar):" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Secondary Audio (Headset / Sonar):" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding SecondaryAudioId, Mode=TwoWay}"
@@ -468,7 +286,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Fallback Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Fallback Audio Endpoint:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableAudioOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding FallbackAudioId, Mode=TwoWay}"
@@ -482,7 +300,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Playback Volume:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Playback Volume:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <Grid Grid.Column="1">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -504,7 +322,7 @@
                                     Minimum="0" Maximum="100" SmallChange="1" LargeChange="5"
                                     VerticalAlignment="Center" Margin="0,0,8,0" />
                             <TextBlock Grid.Column="1" Text="{Binding PlaybackVolumePercent, StringFormat='{}{0}%'}"
-                                       VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
+                                       VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             <CheckBox Grid.Column="2" Content="Mute"
                                       IsChecked="{Binding PlaybackVolumeIsMuted, Mode=TwoWay}"
                                       VerticalAlignment="Center" Margin="8,0,0,0" />
@@ -518,7 +336,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Primary Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Primary Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding PrimaryMicrophoneId, Mode=TwoWay}"
@@ -531,7 +349,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Secondary Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Secondary Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding SecondaryMicrophoneId, Mode=TwoWay}"
@@ -544,7 +362,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Fallback Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Fallback Microphone:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding DataContext.AvailableMicrophoneOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedValue="{Binding FallbackMicrophoneId, Mode=TwoWay}"
@@ -558,7 +376,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Microphone Volume:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Microphone Volume:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <Grid Grid.Column="1">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -580,7 +398,7 @@
                                     Minimum="0" Maximum="100" SmallChange="1" LargeChange="5"
                                     VerticalAlignment="Center" Margin="0,0,8,0" />
                             <TextBlock Grid.Column="1" Text="{Binding MicrophoneVolumePercent, StringFormat='{}{0}%'}"
-                                       VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
+                                       VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             <CheckBox Grid.Column="2" Content="Mute"
                                       IsChecked="{Binding MicrophoneVolumeIsMuted, Mode=TwoWay}"
                                       VerticalAlignment="Center" Margin="8,0,0,0" />
@@ -593,7 +411,7 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Direct Hotkey:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Direct Hotkey:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DirectHotkey, Mode=TwoWay}" Watermark="None (Optional)" />
                 </Grid>
 
@@ -603,12 +421,12 @@
                         <ColumnDefinition Width="180" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Auto-Launch Hooks:" VerticalAlignment="Top" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" />
+                    <TextBlock Text="Auto-Launch Hooks:" VerticalAlignment="Top" Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" />
                     <StackPanel Grid.Column="1">
                         <ItemsControl ItemsSource="{Binding ApplicationHooks}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:ApplicationHookItemViewModel}">
-                                    <Border Background="#050508" BorderBrush="{StaticResource OledBorderBright}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
+                                    <Border Background="{StaticResource GraphiteCardBg}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -616,8 +434,8 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" />
-                                                <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
                                             <CheckBox Grid.Column="1" Content="Close on switch away" IsChecked="{Binding CloseOnSwitchAway, Mode=TwoWay}" VerticalAlignment="Center" Margin="14,0,10,0" FontSize="11" />
                                             <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}" Padding="8,3" FontSize="11" VerticalAlignment="Center" ToolTip="Remove application hook" />
@@ -640,384 +458,599 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Cockpit Header Bar -->
-        <Border Grid.Row="0" Background="#000000" BorderBrush="{StaticResource OledBorder}" BorderThickness="0,0,0,1" Padding="20,14">
+        <!-- Top Header Bar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderFooterBg}"
+                BorderBrush="{StaticResource HeaderFooterBorder}"
+                BorderThickness="0,0,0,1"
+                Padding="22,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="⚡ RIGSWITCH" FontSize="18" FontWeight="ExtraBold" FontFamily="Segoe UI Variable Display, Bahnschrift" Margin="0,0,14,0" Foreground="#FFFFFF" />
-                    <Border Background="#000000" BorderBrush="{StaticResource AccentGreen}" BorderThickness="1.5" CornerRadius="12" Padding="12,4" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding CurrentProfileBadgeText}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" />
+                    <TextBlock Text="⚡ RigSwitch"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Margin="0,0,16,0"
+                               VerticalAlignment="Center" />
+                    <!-- Profile Badge Pill: Soft Sage border/text when Desk, Warm Amber Gold when Rig -->
+                    <Border CornerRadius="12"
+                            BorderThickness="1.5"
+                            Padding="12,4"
+                            VerticalAlignment="Center">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#182A22" />
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentDesk}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRigActive}" Value="True">
+                                        <Setter Property="Background" Value="#2D2316" />
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentRig}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding CurrentProfileBadgeText}"
+                                   FontSize="13"
+                                   FontWeight="Bold">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource AccentDesk}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRigActive}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource AccentRig}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </Border>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="🖥️ Desk Setup" Command="{Binding SwitchToDeskCommand}" Margin="0,0,10,0" BorderBrush="{StaticResource AccentGreen}" />
-                    <Button Content="🏎️ Sim Rig" Command="{Binding SwitchToRigCommand}" BorderBrush="{StaticResource AccentOrange}" />
+
+                <!-- Quick Station Buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="🖥️ Desk Setup"
+                            Command="{Binding SwitchToDeskCommand}"
+                            Style="{StaticResource FluentButton}"
+                            BorderBrush="{StaticResource AccentDesk}"
+                            Margin="0,0,10,0"
+                            Padding="14,7"
+                            FontSize="13" />
+                    <Button Content="🏎️ Sim Rig"
+                            Command="{Binding SwitchToRigCommand}"
+                            Style="{StaticResource FluentButton}"
+                            BorderBrush="{StaticResource AccentRig}"
+                            Padding="14,7"
+                            FontSize="13" />
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Main Tab Content -->
-        <TabControl Grid.Row="1" Background="{StaticResource OledBaseBg}">
-            <!-- Tab 1: Workstation Profiles -->
-            <TabItem Header="⚙️ Workstation Profiles">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20">
-                    <StackPanel>
-                        <!-- Multi-Monitor Configuration & Identification Card -->
-                        <Border Background="#000000" BorderBrush="{StaticResource OledBorderBright}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18" Margin="0,0,0,16">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="🖥️ MULTI-MONITOR TOPOLOGY CONFIGURATION" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource TextPrimary}" />
-                                        <TextBlock Text="Assign connected monitors by number to Desk or Sim Rig piles (supports single, dual, or 3-screen sim rigs)." FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" />
-                                    </StackPanel>
-                                    <Button Grid.Column="1"
-                                            Content="🔍 Identify Monitors"
-                                            Command="{Binding IdentifyMonitorsCommand}"
-                                            Padding="12,6"
-                                            BorderBrush="{StaticResource AccentGreen}"
-                                            VerticalAlignment="Center" />
-                                </Grid>
+        <!-- Main Navigation Body: 2-Column Sidebar Layout -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                                <ItemsControl ItemsSource="{Binding MonitorTiles}"
-                                              ItemTemplate="{StaticResource MonitorTileTemplate}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
+            <!-- Column 0: Left Navigation Sidebar Rail -->
+            <Border Grid.Column="0"
+                    Background="{StaticResource SlateSidebarBg}"
+                    BorderBrush="{StaticResource HeaderFooterBorder}"
+                    BorderThickness="0,0,1,0"
+                    Padding="14,16,14,14">
+                <DockPanel LastChildFill="True">
+                    <!-- Bottom: CoreAudio Watchdog Status Card -->
+                    <Border DockPanel.Dock="Bottom"
+                            Background="{StaticResource GraphiteCardBg}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12"
+                            Margin="0,16,0,0">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Ellipse Width="8" Height="8" Fill="{StaticResource AccentDesk}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="CoreAudio Watchdog" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             </StackPanel>
-                        </Border>
+                            <TextBlock Text="Real-time session monitoring active" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
 
-                        <!-- Desk Presets Card: Pure Black with 3px Deep Emerald Left Accent Stripe -->
-                        <Border Background="#000000" BorderBrush="{StaticResource AccentGreen}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18" Margin="0,0,0,16">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="🖥️ DESK PRESETS" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource AccentGreen}" />
-                                    <TextBlock Text=" — Productivity &amp; Media" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" />
-                                </StackPanel>
-                                <TabControl ItemsSource="{Binding DeskPresets}"
-                                            ItemTemplate="{StaticResource PresetHeaderTemplate}"
-                                            ContentTemplate="{StaticResource PresetDetailTemplate}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Sim Rig Presets Card: Pure Black with 3px Racing Orange Left Accent Stripe -->
-                        <Border Background="#000000" BorderBrush="{StaticResource AccentOrange}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18" Margin="0,0,0,16">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="🏎️ SIM RIG PRESETS" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource AccentOrange}" />
-                                    <TextBlock Text=" — GT3, Rally &amp; Flight Cockpit" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" />
-                                </StackPanel>
-                                <TabControl ItemsSource="{Binding RigPresets}"
-                                            ItemTemplate="{StaticResource PresetHeaderTemplate}"
-                                            ContentTemplate="{StaticResource PresetDetailTemplate}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Hardware Telemetry Summary: Pure Black with 3px Titanium Left Accent Stripe -->
-                        <Border Background="#000000" BorderBrush="{StaticResource OledBorderBright}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="HARDWARE TELEMETRY" FontSize="13" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Content="↻ Refresh Hardware" Command="{Binding RefreshDevicesCommand}" Padding="10,4" FontSize="12" />
-                                </Grid>
-                                <TextBlock Text="Active Displays:" FontWeight="SemiBold" Margin="0,4,0,4" Foreground="{StaticResource TextMuted}" />
-                                <ItemsControl ItemsSource="{Binding DetectedDisplays}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding FriendlyName, StringFormat='• {0}'}" Margin="8,2" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <TextBlock Text="Active Audio Endpoints:" FontWeight="SemiBold" Margin="0,8,0,4" Foreground="{StaticResource TextMuted}" />
-                                <ItemsControl ItemsSource="{Binding DetectedAudioEndpoints}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Name, StringFormat='• {0}'}" Margin="8,2" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
+                    <!-- Top: Navigation Rail Items -->
+                    <StackPanel DockPanel.Dock="Top">
+                        <RadioButton x:Name="NavPresets"
+                                     Content="🖥️ Presets"
+                                     Style="{StaticResource FluentNavButton}"
+                                     GroupName="SidebarNav"
+                                     Tag="0"
+                                     IsChecked="True"
+                                     Checked="NavButton_Checked" />
+                        <RadioButton x:Name="NavDisplays"
+                                     Content="📺 Displays &amp; Topology"
+                                     Style="{StaticResource FluentNavButton}"
+                                     GroupName="SidebarNav"
+                                     Tag="1"
+                                     Checked="NavButton_Checked" />
+                        <RadioButton x:Name="NavAudio"
+                                     Content="🔊 Audio &amp; DAC Lockout"
+                                     Style="{StaticResource FluentNavButton}"
+                                     GroupName="SidebarNav"
+                                     Tag="2"
+                                     Checked="NavButton_Checked" />
+                        <RadioButton x:Name="NavNicknames"
+                                     Content="🏷️ Device Nicknames"
+                                     Style="{StaticResource FluentNavButton}"
+                                     GroupName="SidebarNav"
+                                     Tag="3"
+                                     Checked="NavButton_Checked" />
+                        <RadioButton x:Name="NavHotkeys"
+                                     Content="⌨️ Hotkeys &amp; System"
+                                     Style="{StaticResource FluentNavButton}"
+                                     GroupName="SidebarNav"
+                                     Tag="4"
+                                     Checked="NavButton_Checked" />
                     </StackPanel>
-                </ScrollViewer>
-            </TabItem>
+                </DockPanel>
+            </Border>
 
-            <!-- Tab 2: Device Nicknames -->
-            <TabItem Header="🏷️ Device Nicknames">
-                <Grid Margin="20">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0"
-                               Text="Map detected monitors and audio playback devices to clean friendly names. These nicknames override cryptic Windows hardware identifiers."
-                               Foreground="{StaticResource TextMuted}"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,16" />
+            <!-- Column 1: Main Content Pane -->
+            <TabControl x:Name="ContentTabControl"
+                        Grid.Column="1"
+                        Background="{StaticResource MutedCharcoalBg}"
+                        BorderThickness="0"
+                        Padding="0"
+                        SelectionChanged="ContentTabControl_SelectionChanged">
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter ContentSource="SelectedContent" />
+                        </Border>
+                    </ControlTemplate>
+                </TabControl.Template>
+                <TabControl.Style>
+                    <Style TargetType="TabControl">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsChecked, ElementName=NavPresets}" Value="True">
+                                <Setter Property="SelectedIndex" Value="0" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsChecked, ElementName=NavDisplays}" Value="True">
+                                <Setter Property="SelectedIndex" Value="1" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsChecked, ElementName=NavAudio}" Value="True">
+                                <Setter Property="SelectedIndex" Value="2" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsChecked, ElementName=NavNicknames}" Value="True">
+                                <Setter Property="SelectedIndex" Value="3" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsChecked, ElementName=NavHotkeys}" Value="True">
+                                <Setter Property="SelectedIndex" Value="4" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TabControl.Style>
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding DeviceNicknames}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="#000000"
-                                            BorderBrush="{StaticResource OledBorderBright}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="14"
-                                            Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="280" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <Border Background="#08080C" BorderBrush="{StaticResource AccentGreen}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
-                                                        <TextBlock Text="{Binding DeviceType}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" />
-                                                    </Border>
-                                                    <TextBlock Text="{Binding HardwareName}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
-                                                <TextBlock Text="{Binding DeviceId}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                            <TextBox Grid.Column="1"
-                                                     Text="{Binding CustomNickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                     VerticalAlignment="Center"
-                                                     ToolTip="Enter custom friendly nickname" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                <!-- Page 0: Presets -->
+                <TabItem Header="🖥️ Presets">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,20">
+                        <StackPanel>
+                            <!-- Desk Presets Card -->
+                            <Border Background="{StaticResource GraphiteCardBg}"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="18"
+                                    Margin="0,0,0,16">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                        <TextBlock Text="🖥️ DESK PRESETS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentDesk}" />
+                                        <TextBlock Text=" — Productivity &amp; Media" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <TabControl ItemsSource="{Binding DeskPresets}"
+                                                Style="{StaticResource SubTabControlStyle}"
+                                                ItemTemplate="{StaticResource PresetHeaderTemplate}"
+                                                ContentTemplate="{StaticResource PresetDetailTemplate}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Sim Rig Presets Card -->
+                            <Border Background="{StaticResource GraphiteCardBg}"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="18">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                        <TextBlock Text="🏎️ SIM RIG PRESETS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentRig}" />
+                                        <TextBlock Text=" — GT3, Rally &amp; Flight Cockpit" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <TabControl ItemsSource="{Binding RigPresets}"
+                                                Style="{StaticResource SubTabControlStyle}"
+                                                ItemTemplate="{StaticResource PresetHeaderTemplate}"
+                                                ContentTemplate="{StaticResource PresetDetailTemplate}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </ScrollViewer>
-                </Grid>
-            </TabItem>
+                </TabItem>
 
-            <!-- Tab 3: Audio Device Visibility -->
-            <TabItem Header="🎧 Audio Cleanup">
-                <Grid Margin="20">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0"
-                               Text="Clean up Windows audio menus by toggling virtual playback endpoints. Unchecked devices (e.g. SteelSeries Sonar virtual channels, Oculus Virtual Audio, Steam Streaming) are disabled in real-time."
-                               Foreground="{StaticResource TextMuted}"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,14" />
+                <!-- Page 1: Displays & Topology -->
+                <TabItem Header="📺 Displays &amp; Topology">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,20">
+                        <StackPanel>
+                            <!-- Multi-Monitor Topology Card -->
+                            <Border Background="{StaticResource GraphiteCardBg}"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="18"
+                                    Margin="0,0,0,16">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="🖥️ MULTI-MONITOR TOPOLOGY CONFIGURATION" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Assign connected monitors by number to Desk or Sim Rig piles (supports single, dual, or 3-screen sim rigs)." FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Content="🔍 Identify Monitors"
+                                                Command="{Binding IdentifyMonitorsCommand}"
+                                                Padding="12,6"
+                                                Style="{StaticResource FluentButton}"
+                                                BorderBrush="{StaticResource AccentDesk}"
+                                                VerticalAlignment="Center" />
+                                    </Grid>
 
-                    <!-- Search and Filter Controls -->
-                    <Grid Grid.Row="1" Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                                    <ItemsControl ItemsSource="{Binding MonitorTiles}"
+                                                  ItemTemplate="{StaticResource MonitorTileTemplate}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Search Box with Clean Watermark -->
-                        <Grid Grid.Column="0" Margin="0,0,12,0">
-                            <TextBox x:Name="AudioSearchTextBox"
-                                     Text="{Binding AudioSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     Padding="10,6"
-                                     ToolTip="Search audio devices by name or adapter" />
-                            <TextBlock Text="🔍 Search audio endpoints..."
-                                       Foreground="#55556E"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"
-                                       Margin="12,0,0,0"
-                                       IsHitTestVisible="False">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Text, ElementName=AudioSearchTextBox}" Value="">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                            <!-- Hardware Telemetry Summary Card -->
+                            <Border Background="{StaticResource GraphiteCardBg}"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="18">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="HARDWARE TELEMETRY" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="↻ Refresh Hardware" Command="{Binding RefreshDevicesCommand}" Style="{StaticResource FluentButton}" Padding="10,4" FontSize="12" />
+                                    </Grid>
+                                    <TextBlock Text="Active Displays:" FontWeight="SemiBold" Margin="0,4,0,4" Foreground="{StaticResource TextMutedBrush}" />
+                                    <ItemsControl ItemsSource="{Binding DetectedDisplays}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding FriendlyName, StringFormat='• {0}'}" Foreground="{StaticResource TextPrimaryBrush}" Margin="8,2" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="Active Audio Endpoints:" FontWeight="SemiBold" Margin="0,8,0,4" Foreground="{StaticResource TextMutedBrush}" />
+                                    <ItemsControl ItemsSource="{Binding DetectedAudioEndpoints}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Name, StringFormat='• {0}'}" Foreground="{StaticResource TextPrimaryBrush}" Margin="8,2" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Page 2: Audio & DAC Lockout -->
+                <TabItem Header="🔊 Audio &amp; DAC Lockout">
+                    <Grid Margin="24,20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="Clean up Windows audio menus by toggling virtual playback endpoints. Unchecked devices (e.g. SteelSeries Sonar virtual channels, Oculus Virtual Audio, Steam Streaming) are disabled in real-time."
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,14" />
+
+                        <!-- Search and Filter Controls -->
+                        <Grid Grid.Row="1" Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Search Box with Clean Watermark -->
+                            <Grid Grid.Column="0" Margin="0,0,12,0">
+                                <TextBox x:Name="AudioSearchTextBox"
+                                         Text="{Binding AudioSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FluentTextBox}"
+                                         Padding="10,6"
+                                         ToolTip="Search audio devices by name or adapter" />
+                                <TextBlock Text="🔍 Search audio endpoints..."
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=AudioSearchTextBox}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+
+                            <!-- Status Filter Buttons -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="All Devices"
+                                        Command="{Binding SelectAllAudioFilterCommand}"
+                                        Style="{StaticResource FluentButton}"
+                                        Padding="12,5"
+                                        Margin="0,0,6,0"
+                                        FontSize="12" />
+                                <Button Content="Active Only"
+                                        Command="{Binding SelectActiveAudioFilterCommand}"
+                                        Style="{StaticResource FluentButton}"
+                                        Padding="12,5"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        BorderBrush="{StaticResource AccentDesk}" />
+                                <Button Content="Disabled / Unplugged"
+                                        Command="{Binding SelectInactiveAudioFilterCommand}"
+                                        Style="{StaticResource FluentButton}"
+                                        Padding="12,5"
+                                        FontSize="12"
+                                        BorderBrush="{StaticResource AccentRig}" />
+                            </StackPanel>
                         </Grid>
 
-                        <!-- Status Filter Buttons -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Content="All Devices"
-                                    Command="{Binding SelectAllAudioFilterCommand}"
-                                    Padding="12,5"
-                                    Margin="0,0,6,0"
-                                    FontSize="12" />
-                            <Button Content="Active Only"
-                                    Command="{Binding SelectActiveAudioFilterCommand}"
-                                    Padding="12,5"
-                                    Margin="0,0,6,0"
-                                    FontSize="12"
-                                    BorderBrush="{StaticResource AccentGreen}" />
-                            <Button Content="Disabled / Unplugged"
-                                    Command="{Binding SelectInactiveAudioFilterCommand}"
-                                    Padding="12,5"
-                                    FontSize="12"
-                                    BorderBrush="{StaticResource AccentOrange}" />
-                        </StackPanel>
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding FilteredAudioEndpoints}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource GraphiteCardBg}"
+                                                BorderBrush="{StaticResource CardBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="14"
+                                                Margin="0,0,0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0"
+                                                          IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,14,0"
+                                                          ToolTip="Toggle endpoint visibility in Windows audio menus" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Adapter}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Id}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" Opacity="0.7" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+
+                                                <!-- Blacklist / Bass Shaker Exclusion Toggle -->
+                                                <CheckBox Grid.Column="2"
+                                                          Content="Exclude / Bass Shaker DAC"
+                                                          IsChecked="{Binding IsBlacklisted, Mode=TwoWay}"
+                                                          VerticalAlignment="Center"
+                                                          FontSize="12"
+                                                          Margin="0,0,16,0"
+                                                          ToolTip="Exclude this audio endpoint from profile routing (e.g. Bass Shaker / Buttkicker DAC)." />
+
+                                                <!-- Presence State Badge -->
+                                                <Border Grid.Column="3"
+                                                        Background="{Binding StateBadgeBackground}"
+                                                        BorderBrush="{Binding StateBadgeBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="10,4"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding StateLabel}"
+                                                               FontSize="11"
+                                                               FontWeight="Bold"
+                                                               Foreground="{Binding StateBadgeForeground}" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </Grid>
+                </TabItem>
 
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding FilteredAudioEndpoints}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="#050508"
-                                            BorderBrush="{StaticResource OledBorderBright}"
-                                            BorderThickness="1"
-                                            CornerRadius="4"
-                                            Padding="14"
-                                            Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <CheckBox Grid.Column="0"
-                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,14,0"
-                                                      ToolTip="Toggle endpoint visibility in Windows audio menus" />
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
-                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Adapter}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Id}" FontSize="10" Foreground="#55556E" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
+                <!-- Page 3: Device Nicknames -->
+                <TabItem Header="🏷️ Device Nicknames">
+                    <Grid Margin="24,20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="Map detected monitors and audio playback devices to clean friendly names. These nicknames override cryptic Windows hardware identifiers."
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,16" />
 
-                                            <!-- Blacklist / Bass Shaker Exclusion Toggle -->
-                                            <CheckBox Grid.Column="2"
-                                                      Content="Exclude / Bass Shaker DAC"
-                                                      IsChecked="{Binding IsBlacklisted, Mode=TwoWay}"
-                                                      VerticalAlignment="Center"
-                                                      FontSize="12"
-                                                      Margin="0,0,16,0"
-                                                      ToolTip="Exclude this audio endpoint from profile routing (e.g. Bass Shaker / Buttkicker DAC)." />
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding DeviceNicknames}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource GraphiteCardBg}"
+                                                BorderBrush="{StaticResource CardBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="14"
+                                                Margin="0,0,0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="280" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Background="#1C1D1F" BorderBrush="{StaticResource AccentDesk}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding DeviceType}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentDesk}" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding HardwareName}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding DeviceId}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBox Grid.Column="1"
+                                                         Text="{Binding CustomNickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         Style="{StaticResource FluentTextBox}"
+                                                         VerticalAlignment="Center"
+                                                         ToolTip="Enter custom friendly nickname" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
 
-                                            <!-- Presence State Badge -->
-                                            <Border Grid.Column="3"
-                                                    Background="{Binding StateBadgeBackground}"
-                                                    BorderBrush="{Binding StateBadgeBorder}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="10"
-                                                    Padding="10,4"
-                                                    VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding StateLabel}"
-                                                           FontSize="11"
-                                                           FontWeight="Bold"
-                                                           Foreground="{Binding StateBadgeForeground}" />
-                                            </Border>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                <!-- Page 4: Hotkeys & System -->
+                <TabItem Header="⌨️ Hotkeys &amp; System">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,20">
+                        <StackPanel>
+                            <!-- Global Hotkeys Card -->
+                            <Border Background="{StaticResource GraphiteCardBg}"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="18"
+                                    Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="GLOBAL HOTKEYS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentRig}" Margin="0,0,0,14" />
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Toggle Desk / Sim Rig:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
+                                        <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding ToggleHotkey, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Direct Desk Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
+                                        <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DeskHotkey, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Direct Sim Rig Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
+                                        <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding RigHotkey, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Toggle Audio (Speakers / Headset):" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
+                                        <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding AudioToggleHotkey, Mode=TwoWay}" Watermark="None (Optional)" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Preferences Card -->
+                            <Border Background="{StaticResource GraphiteCardBg}"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="18">
+                                <StackPanel>
+                                    <TextBlock Text="APPLICATION PREFERENCES" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,14" />
+                                    <CheckBox Content="Start RigSwitch minimized to Windows system tray"
+                                              IsChecked="{Binding StartMinimizedToTray, Mode=TwoWay}"
+                                              Margin="0,0,0,12" />
+                                    <CheckBox Content="Display balloon notifications when workstation profile switches"
+                                              IsChecked="{Binding ShowToastNotifications, Mode=TwoWay}"
+                                              Margin="0,0,0,12" />
+                                    <CheckBox Content="Actively enforce primary speakers against background hijacks (e.g. SteelSeries Sonar)"
+                                              IsChecked="{Binding EnforcePrimaryAudio, Mode=TwoWay}"
+                                              Margin="0,0,0,12" />
+                                    <CheckBox Content="Automatically check for updates on startup"
+                                              IsChecked="{Binding EnableAutoUpdateCheck, Mode=TwoWay}"
+                                              Margin="0,0,0,16" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Software Updates" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Check GitHub Releases and WinGet for new RigSwitch versions" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="🚀 Check for Updates" Command="{Binding CheckForUpdatesCommand}" Style="{StaticResource FluentButton}" Padding="12,6" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </ScrollViewer>
-                </Grid>
-            </TabItem>
+                </TabItem>
+            </TabControl>
+        </Grid>
 
-            <!-- Tab 4: Hotkeys & System -->
-            <TabItem Header="⌨️ Global Hotkeys">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
-                    <StackPanel>
-                        <!-- Global Hotkeys Card: Pure Black with 3px Racing Orange Left Accent Stripe -->
-                        <Border Background="#000000" BorderBrush="{StaticResource AccentOrange}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18" Margin="0,0,0,16">
-                            <StackPanel>
-                                <TextBlock Text="GLOBAL HOTKEYS" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource AccentOrange}" Margin="0,0,0,14" />
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Toggle Desk / Sim Rig:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding ToggleHotkey, Mode=TwoWay}" />
-                                </Grid>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Direct Desk Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding DeskHotkey, Mode=TwoWay}" />
-                                </Grid>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Direct Sim Rig Activation:" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding RigHotkey, Mode=TwoWay}" />
-                                </Grid>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Toggle Audio (Speakers / Headset):" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
-                                    <ctrl:HotkeyRecorderControl Grid.Column="1" Hotkey="{Binding AudioToggleHotkey, Mode=TwoWay}" Watermark="None (Optional)" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Preferences Card: Pure Black with 3px Titanium Left Accent Stripe -->
-                        <Border Background="#000000" BorderBrush="{StaticResource OledBorderBright}" BorderThickness="3,1,1,1" CornerRadius="6" Padding="18">
-                            <StackPanel>
-                                <TextBlock Text="APPLICATION PREFERENCES" FontSize="14" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Bahnschrift" Foreground="{StaticResource TextMuted}" Margin="0,0,0,14" />
-                                <CheckBox Content="Start RigSwitch minimized to Windows system tray"
-                                          IsChecked="{Binding StartMinimizedToTray, Mode=TwoWay}"
-                                          Margin="0,0,0,12" />
-                                <CheckBox Content="Display balloon notifications when workstation profile switches"
-                                          IsChecked="{Binding ShowToastNotifications, Mode=TwoWay}"
-                                          Margin="0,0,0,12" />
-                                <CheckBox Content="Actively enforce primary speakers against background hijacks (e.g. SteelSeries Sonar)"
-                                          IsChecked="{Binding EnforcePrimaryAudio, Mode=TwoWay}"
-                                          Margin="0,0,0,12" />
-                                <CheckBox Content="Automatically check for updates on startup"
-                                          IsChecked="{Binding EnableAutoUpdateCheck, Mode=TwoWay}"
-                                          Margin="0,0,0,16" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Software Updates" FontWeight="Bold" />
-                                        <TextBlock Text="Check GitHub Releases and WinGet for new RigSwitch versions" FontSize="11" Foreground="{StaticResource TextMuted}" />
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Content="🚀 Check for Updates" Command="{Binding CheckForUpdatesCommand}" Padding="12,6" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-        </TabControl>
-
-        <!-- Bottom Action Bar & Status -->
-        <Border Grid.Row="2" Background="#000000" BorderBrush="{StaticResource OledBorder}" BorderThickness="0,1,0,0" Padding="20,12">
+        <!-- Bottom Status & Action Bar -->
+        <Border Grid.Row="2"
+                Background="{StaticResource HeaderFooterBg}"
+                BorderBrush="{StaticResource HeaderFooterBorder}"
+                BorderThickness="0,1,0,0"
+                Padding="22,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="1" Content="💾 Save Settings" Command="{Binding SaveSettingsCommand}" Style="{StaticResource AccentSaveButtonStyle}" />
+                <TextBlock Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           FontSize="13.5"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="1"
+                        Content="💾 Save Settings"
+                        Command="{Binding SaveSettingsCommand}"
+                        Style="{StaticResource FluentActionButton}"
+                        Background="{StaticResource AccentDesk}"
+                        Foreground="#141517"
+                        FontWeight="Bold"
+                        FontSize="13.5"
+                        Padding="22,8" />
             </Grid>
         </Border>
     </Grid>
