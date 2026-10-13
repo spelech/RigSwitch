@@ -92,13 +92,11 @@ public sealed class UiScreenshotCaptureTests
             System.IO.Directory.CreateDirectory(outDir);
 
             window.Show();
-            
+
             void CaptureView(int index, string filename)
             {
                 window.ContentTabControl.SelectedIndex = index;
                 window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-                window.Measure(new Size(960, 700));
-                window.Arrange(new Rect(0, 0, 960, 700));
                 window.UpdateLayout();
                 SaveWindowToPng(window, System.IO.Path.Combine(outDir, filename));
             }
