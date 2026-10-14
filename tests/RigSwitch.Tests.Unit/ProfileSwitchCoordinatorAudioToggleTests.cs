@@ -197,4 +197,46 @@ public sealed class ProfileSwitchCoordinatorAudioToggleTests
         await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync("{SONAR-HEADSET}", Arg.Any<CancellationToken>());
         await _audioDirector.DidNotReceive().SetDefaultCaptureEndpointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task SwitchProfile_WhenPrimaryIsNotPresent_NotifiesIntentionalSwitchWithResolvedFallback()
+    {
+        var settings = new UserSettings
+        {
+            ActiveAudioOutputMode = AudioOutputMode.Primary,
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{PEBBLE-USB}",
+                    FallbackAudioId = "{MONITOR-OLED}",
+                    TargetMonitorIds = ["MONITOR-1"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("MONITOR-1", @"\\.\DISPLAY1", "OLED", "GPU", true, true)]);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{PEBBLE-USB}", "Pebble V3", "USB", DevicePresenceState.NotPresent, false, false, AudioDeviceFlow.Playback),
+            new("{MONITOR-OLED}", "MPG341CX OLED", "NVIDIA", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>()).Returns(endpoints);
+
+        var notifiedEndpoints = new List<string>();
+        var coordinator = new ProfileSwitchCoordinator(
+            _displayManager,
+            _audioDirector,
+            _storageService,
+            onIntentionalAudioSwitch: notifiedEndpoints.Add);
+
+        await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        Assert.Single(notifiedEndpoints);
+        Assert.Equal("{MONITOR-OLED}", notifiedEndpoints[0]);
+    }
 }
+

@@ -181,14 +181,16 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
                 return;
             }
 
-            bool isBlacklisted = settings.BlacklistedAudioEndpointIds?.Any(b => MatchesEndpoint(b, newEndpointId)) == true;
+            var blacklisted = settings.BlacklistedAudioEndpointIds;
+            var renderEndpoints = TryGetRenderEndpoints();
+
+            bool isBlacklisted = blacklisted?.Any(b => MatchesEndpoint(b, newEndpointId)) == true;
             if (isBlacklisted)
             {
                 string? targetId = null;
                 lock (_syncLock)
                 {
-                    if (!string.IsNullOrWhiteSpace(_activeExpectedEndpointId) &&
-                        settings.BlacklistedAudioEndpointIds?.Any(b => MatchesEndpoint(b, _activeExpectedEndpointId)) != true)
+                    if (IsEndpointAvailable(_activeExpectedEndpointId, blacklisted, renderEndpoints))
                     {
                         targetId = _activeExpectedEndpointId;
                     }
@@ -197,14 +199,14 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
                 if (string.IsNullOrWhiteSpace(targetId))
                 {
                     var activePreset = settings.GetActivePreset(settings.LastActiveProfile);
-                    targetId = (settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(activePreset.SecondaryAudioId))
-                        ? activePreset.SecondaryAudioId
-                        : activePreset.PrimaryAudioId;
+                    targetId = ResolveEffectiveTargetEndpoint(activePreset, settings.ActiveAudioOutputMode, blacklisted, renderEndpoints);
+                }
 
-                    if (string.IsNullOrWhiteSpace(targetId) || settings.BlacklistedAudioEndpointIds?.Any(b => MatchesEndpoint(b, targetId)) == true)
-                    {
-                        targetId = activePreset.FallbackAudioId;
-                    }
+                if (string.IsNullOrWhiteSpace(targetId) && renderEndpoints is { Count: > 0 })
+                {
+                    targetId = renderEndpoints
+                        .FirstOrDefault(e => e.State == DevicePresenceState.Active && blacklisted?.Any(b => MatchesEndpoint(b, e.Id)) != true)
+                        ?.Id;
                 }
 
                 if (!string.IsNullOrWhiteSpace(targetId))
@@ -220,22 +222,25 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
                 return;
             }
 
-            // Enforce primary audio when enabled and in Primary audio mode
+            // Enforce primary audio (or its active fallback) when enabled and in Primary audio mode
             if (settings.EnforcePrimaryAudio && settings.ActiveAudioOutputMode == AudioOutputMode.Primary)
             {
                 var activePreset = settings.GetActivePreset(settings.LastActiveProfile);
-                var primaryId = activePreset.PrimaryAudioId;
+                var effectiveTargetId = ResolveEffectiveTargetEndpoint(
+                    activePreset,
+                    AudioOutputMode.Primary,
+                    blacklisted,
+                    renderEndpoints);
 
-                if (!string.IsNullOrWhiteSpace(primaryId) &&
-                    !MatchesEndpoint(primaryId, newEndpointId) &&
-                    settings.BlacklistedAudioEndpointIds?.Any(b => MatchesEndpoint(b, primaryId)) != true)
+                if (!string.IsNullOrWhiteSpace(effectiveTargetId) &&
+                    !MatchesEndpoint(effectiveTargetId, newEndpointId))
                 {
                     lock (_syncLock)
                     {
-                        _activeExpectedEndpointId = primaryId;
+                        _activeExpectedEndpointId = effectiveTargetId;
                     }
 
-                    await _director.SetDefaultPlaybackEndpointAsync(primaryId, cancellationToken).ConfigureAwait(false);
+                    await _director.SetDefaultPlaybackEndpointAsync(effectiveTargetId, cancellationToken).ConfigureAwait(false);
                     return;
                 }
             }
@@ -250,6 +255,65 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
         {
             _reentrancyLock.Release();
         }
+    }
+
+    private IReadOnlyList<AudioEndpointInfo>? TryGetRenderEndpoints()
+    {
+        try
+        {
+            return _provider.EnumerateRenderEndpoints();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AudioEndpointWatchdogService] Error enumerating render endpoints: {ex}");
+            return null;
+        }
+    }
+
+    private static string? ResolveEffectiveTargetEndpoint(
+        WorkstationPreset activePreset,
+        AudioOutputMode mode,
+        IReadOnlyList<string>? blacklisted,
+        IReadOnlyList<AudioEndpointInfo>? renderEndpoints)
+    {
+        var preferredId = (mode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(activePreset.SecondaryAudioId))
+            ? activePreset.SecondaryAudioId
+            : activePreset.PrimaryAudioId;
+
+        if (IsEndpointAvailable(preferredId, blacklisted, renderEndpoints))
+        {
+            return preferredId;
+        }
+
+        if (IsEndpointAvailable(activePreset.FallbackAudioId, blacklisted, renderEndpoints))
+        {
+            return activePreset.FallbackAudioId;
+        }
+
+        return null;
+    }
+
+    private static bool IsEndpointAvailable(
+        string? candidateId,
+        IReadOnlyList<string>? blacklisted,
+        IReadOnlyList<AudioEndpointInfo>? renderEndpoints)
+    {
+        if (string.IsNullOrWhiteSpace(candidateId))
+        {
+            return false;
+        }
+
+        if (blacklisted?.Any(b => MatchesEndpoint(b, candidateId)) == true)
+        {
+            return false;
+        }
+
+        if (renderEndpoints is { Count: > 0 })
+        {
+            return renderEndpoints.Any(e => e.State == DevicePresenceState.Active && MatchesEndpoint(candidateId, e.Id));
+        }
+
+        return true;
     }
 
     private bool IsExpectedOrIntentional(string endpointId)

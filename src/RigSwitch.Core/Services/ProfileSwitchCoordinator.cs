@@ -15,6 +15,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     private readonly IAudioEndpointDirector _audioDirector;
     private readonly ISettingsStorageService _settingsStorageService;
     private readonly IApplicationLifecycleHookService? _appHookService;
+    private readonly Action<string>? _onIntentionalAudioSwitch;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
     private UserSettings? _settings;
@@ -27,12 +28,14 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     /// <param name="settingsStorageService">The settings storage service.</param>
     /// <param name="initialProfile">The initial workstation profile mode.</param>
     /// <param name="appHookService">Optional application lifecycle hook service.</param>
+    /// <param name="onIntentionalAudioSwitch">Optional callback invoked with the resolved endpoint ID immediately before switching playback audio.</param>
     public ProfileSwitchCoordinator(
         IDisplayConfigurationService displayConfigService,
         IAudioEndpointDirector audioDirector,
         ISettingsStorageService settingsStorageService,
         ProfileMode initialProfile = ProfileMode.Desk,
-        IApplicationLifecycleHookService? appHookService = null)
+        IApplicationLifecycleHookService? appHookService = null,
+        Action<string>? onIntentionalAudioSwitch = null)
     {
         ArgumentNullException.ThrowIfNull(displayConfigService);
         ArgumentNullException.ThrowIfNull(audioDirector);
@@ -42,6 +45,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         _audioDirector = audioDirector;
         _settingsStorageService = settingsStorageService;
         _appHookService = appHookService;
+        _onIntentionalAudioSwitch = onIntentionalAudioSwitch;
         CurrentProfile = initialProfile;
     }
 
@@ -121,6 +125,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
             {
+                _onIntentionalAudioSwitch?.Invoke(resolvedAudioId);
                 await _audioDirector.SetDefaultPlaybackEndpointAsync(resolvedAudioId, cancellationToken).ConfigureAwait(false);
             }
 
@@ -240,6 +245,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
             {
+                _onIntentionalAudioSwitch?.Invoke(resolvedAudioId);
                 await _audioDirector.SetDefaultPlaybackEndpointAsync(resolvedAudioId, cancellationToken).ConfigureAwait(false);
             }
 

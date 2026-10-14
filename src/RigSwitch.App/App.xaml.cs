@@ -86,7 +86,8 @@ public partial class App : Application
                     sp.GetRequiredService<IDisplayConfigurationService>(),
                     sp.GetRequiredService<IAudioEndpointDirector>(),
                     sp.GetRequiredService<ISettingsStorageService>(),
-                    appHookService: sp.GetRequiredService<IApplicationLifecycleHookService>()));
+                    appHookService: sp.GetRequiredService<IApplicationLifecycleHookService>(),
+                    onIntentionalAudioSwitch: sp.GetRequiredService<IAudioEndpointWatchdogService>().NotifyIntentionalSwitch));
 
             builder.Services.AddSingleton<TrayIconService>();
             builder.Services.AddSingleton<MainSettingsViewModel>();
@@ -101,7 +102,11 @@ public partial class App : Application
                     sp.GetRequiredService<IAudioEndpointWatchdogService>(),
                     sp.GetRequiredService<IDisplayConfigurationService>(),
                     sp.GetRequiredService<IAudioEndpointDirector>(),
-                    (view, path) => sp.GetRequiredService<MainSettingsWindow>().CaptureScreenshotAsync(view, path)));
+                    (view, path) =>
+                    {
+                        var window = Dispatcher.Invoke(() => _mainWindow ??= sp.GetRequiredService<MainSettingsWindow>());
+                        return window.CaptureScreenshotAsync(view, path);
+                    }));
             builder.Services.AddSingleton<CliController>();
 
             _host = builder.Build();
@@ -118,7 +123,6 @@ public partial class App : Application
             var settingsStorage = _host.Services.GetRequiredService<ISettingsStorageService>();
             var coordinator = _host.Services.GetRequiredService<IProfileSwitchCoordinator>();
             var viewModel = _host.Services.GetRequiredService<MainSettingsViewModel>();
-            _mainWindow = _host.Services.GetRequiredService<MainSettingsWindow>();
             _trayIconService = _host.Services.GetRequiredService<TrayIconService>();
 
             var watchdog = _host.Services.GetRequiredService<IAudioEndpointWatchdogService>();
@@ -183,15 +187,6 @@ public partial class App : Application
                 {
                     if (args.Success)
                     {
-                        var activePreset = args.ActivePreset;
-                        var audioTarget = coordinator.CurrentAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(activePreset?.SecondaryAudioId)
-                            ? activePreset?.SecondaryAudioId
-                            : activePreset?.PrimaryAudioId;
-                        if (!string.IsNullOrWhiteSpace(audioTarget))
-                        {
-                            watchdog.NotifyIntentionalSwitch(audioTarget);
-                        }
-
                         _trayIconService.UpdateTrayState(args.NewProfile, args.ActivePreset);
                         _trayIconService.ShowNotification("RigSwitch", $"Switched to {args.NewProfile} setup [{args.ActivePreset?.Name ?? "Default"}].");
                     }
@@ -237,13 +232,14 @@ public partial class App : Application
 
     private void ShowSettingsWindow()
     {
-        if (_mainWindow == null)
+        if (_host == null)
         {
             return;
         }
 
         Dispatcher.Invoke(() =>
         {
+            _mainWindow ??= _host.Services.GetRequiredService<MainSettingsWindow>();
             MainWindow = _mainWindow;
             _mainWindow.Show();
             if (_mainWindow.WindowState == WindowState.Minimized)

@@ -173,4 +173,112 @@ public sealed class AudioEndpointWatchdogServiceTests
 
         await _director.Received(1).SetDefaultPlaybackEndpointAsync("{SPEAKERS}", Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task WhenEnforcePrimaryAudioEnabled_AndPrimaryIsNotPresent_AndCurrentIsFallback_WatchdogDoesNotRevertToOfflinePrimary()
+    {
+        var settings = new UserSettings
+        {
+            EnforcePrimaryAudio = true,
+            ActiveAudioOutputMode = AudioOutputMode.Primary,
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{PEBBLE-USB}",
+                    FallbackAudioId = "{MONITOR-OLED}"
+                }
+            ]
+        };
+        _storage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _provider.EnumerateRenderEndpoints().Returns(
+        [
+            new AudioEndpointInfo("{PEBBLE-USB}", "Speakers (Pebble V3)", "Pebble V3", DevicePresenceState.NotPresent, false, false),
+            new AudioEndpointInfo("{MONITOR-OLED}", "MPG341CX OLED", "NVIDIA High Definition Audio", DevicePresenceState.Active, true, false)
+        ]);
+
+        using var watchdog = new AudioEndpointWatchdogService(_provider, _director, _storage);
+        watchdog.Start();
+
+        _provider.DefaultDeviceChanged += Raise.Event<Action<EDataFlow, ERole, string>>(
+            EDataFlow.eRender, ERole.eConsole, "{MONITOR-OLED}");
+
+        await Task.Delay(350);
+
+        await _director.DidNotReceive().SetDefaultPlaybackEndpointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WhenEnforcePrimaryAudioEnabled_AndPrimaryIsNotPresent_AndUnauthorizedSwitchOccurs_WatchdogRevertsToActiveFallback()
+    {
+        var settings = new UserSettings
+        {
+            EnforcePrimaryAudio = true,
+            ActiveAudioOutputMode = AudioOutputMode.Primary,
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{PEBBLE-USB}",
+                    SecondaryAudioId = "{SONAR}",
+                    FallbackAudioId = "{MONITOR-OLED}"
+                }
+            ]
+        };
+        _storage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _provider.EnumerateRenderEndpoints().Returns(
+        [
+            new AudioEndpointInfo("{PEBBLE-USB}", "Speakers (Pebble V3)", "Pebble V3", DevicePresenceState.NotPresent, false, false),
+            new AudioEndpointInfo("{SONAR}", "SteelSeries Sonar - Gaming", "SteelSeries Sonar", DevicePresenceState.Active, true, true),
+            new AudioEndpointInfo("{MONITOR-OLED}", "MPG341CX OLED", "NVIDIA High Definition Audio", DevicePresenceState.Active, false, false)
+        ]);
+
+        using var watchdog = new AudioEndpointWatchdogService(_provider, _director, _storage);
+        watchdog.Start();
+
+        _provider.DefaultDeviceChanged += Raise.Event<Action<EDataFlow, ERole, string>>(
+            EDataFlow.eRender, ERole.eConsole, "{SONAR}");
+
+        await Task.Delay(350);
+
+        await _director.DidNotReceive().SetDefaultPlaybackEndpointAsync("{PEBBLE-USB}", Arg.Any<CancellationToken>());
+        await _director.Received(1).SetDefaultPlaybackEndpointAsync("{MONITOR-OLED}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WhenDefaultSwitchesToBlacklistedDevice_AndPrimaryIsNotPresent_WatchdogRevertsToActiveFallback()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{SHAKER-DAC}"],
+            ActiveAudioOutputMode = AudioOutputMode.Primary,
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{PEBBLE-USB}",
+                    FallbackAudioId = "{MONITOR-OLED}"
+                }
+            ]
+        };
+        _storage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _provider.EnumerateRenderEndpoints().Returns(
+        [
+            new AudioEndpointInfo("{PEBBLE-USB}", "Speakers (Pebble V3)", "Pebble V3", DevicePresenceState.NotPresent, false, false),
+            new AudioEndpointInfo("{SHAKER-DAC}", "Chassis - Fosi BST-1", "USB Audio Adapter", DevicePresenceState.Active, true, false),
+            new AudioEndpointInfo("{MONITOR-OLED}", "MPG341CX OLED", "NVIDIA High Definition Audio", DevicePresenceState.Active, false, false)
+        ]);
+
+        using var watchdog = new AudioEndpointWatchdogService(_provider, _director, _storage);
+        watchdog.Start();
+
+        _provider.DefaultDeviceChanged += Raise.Event<Action<EDataFlow, ERole, string>>(
+            EDataFlow.eRender, ERole.eConsole, "{SHAKER-DAC}");
+
+        await Task.Delay(350);
+
+        await _director.DidNotReceive().SetDefaultPlaybackEndpointAsync("{PEBBLE-USB}", Arg.Any<CancellationToken>());
+        await _director.Received(1).SetDefaultPlaybackEndpointAsync("{MONITOR-OLED}", Arg.Any<CancellationToken>());
+    }
 }
+

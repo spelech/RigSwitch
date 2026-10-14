@@ -14,7 +14,8 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
     private readonly IMMDeviceEnumerator? _deviceEnumerator;
     private readonly IPolicyConfig? _policyConfig;
     private readonly Action<string, bool>? _registryFallbackAction;
-    private readonly bool _ownsEnumerator;
+    private readonly bool _ownsCallbackEnumerator;
+    private IMMDeviceEnumerator? _callbackEnumerator;
     private bool _isCallbackRegistered;
     private bool _disposed;
 
@@ -28,13 +29,16 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
     {
         try
         {
-            _deviceEnumerator = CreateDeviceEnumerator();
-            _ownsEnumerator = true;
-            int hr = _deviceEnumerator.RegisterEndpointNotificationCallback(this);
-            if (hr == 0)
+            _ownsCallbackEnumerator = true;
+            Task.Run(() =>
             {
-                _isCallbackRegistered = true;
-            }
+                _callbackEnumerator = CreateDeviceEnumerator();
+                int hr = _callbackEnumerator.RegisterEndpointNotificationCallback(this);
+                if (hr == 0)
+                {
+                    _isCallbackRegistered = true;
+                }
+            }).GetAwaiter().GetResult();
         }
         catch
         {
@@ -54,15 +58,16 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
         Action<string, bool>? registryFallbackAction = null)
     {
         _deviceEnumerator = deviceEnumerator;
+        _callbackEnumerator = deviceEnumerator;
         _policyConfig = policyConfig;
         _registryFallbackAction = registryFallbackAction;
-        _ownsEnumerator = false;
+        _ownsCallbackEnumerator = false;
 
-        if (_deviceEnumerator != null)
+        if (_callbackEnumerator != null)
         {
             try
             {
-                int hr = _deviceEnumerator.RegisterEndpointNotificationCallback(this);
+                int hr = _callbackEnumerator.RegisterEndpointNotificationCallback(this);
                 if (hr == 0)
                 {
                     _isCallbackRegistered = true;
@@ -480,29 +485,34 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
     private static partial Regex EndpointGuidRegex();
 
     /// <inheritdoc/>
-    public void OnDeviceStateChanged(string pwstrDeviceId, DevicePresenceState dwNewState)
+    public int OnDeviceStateChanged(string pwstrDeviceId, DevicePresenceState dwNewState)
     {
+        return 0;
     }
 
     /// <inheritdoc/>
-    public void OnDeviceAdded(string pwstrDeviceId)
+    public int OnDeviceAdded(string pwstrDeviceId)
     {
+        return 0;
     }
 
     /// <inheritdoc/>
-    public void OnDeviceRemoved(string pwstrDeviceId)
+    public int OnDeviceRemoved(string pwstrDeviceId)
     {
+        return 0;
     }
 
     /// <inheritdoc/>
-    public void OnDefaultDeviceChanged(EDataFlow flow, ERole role, string pwstrDefaultDeviceId)
+    public int OnDefaultDeviceChanged(EDataFlow flow, ERole role, string pwstrDefaultDeviceId)
     {
         DefaultDeviceChanged?.Invoke(flow, role, pwstrDefaultDeviceId);
+        return 0;
     }
 
     /// <inheritdoc/>
-    public void OnPropertyValueChanged(string pwstrDeviceId, PROPERTYKEY key)
+    public int OnPropertyValueChanged(string pwstrDeviceId, PROPERTYKEY key)
     {
+        return 0;
     }
 
     /// <inheritdoc/>
@@ -515,13 +525,13 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
 
         _disposed = true;
 
-        if (_deviceEnumerator != null)
+        if (_callbackEnumerator != null)
         {
             if (_isCallbackRegistered)
             {
                 try
                 {
-                    _deviceEnumerator.UnregisterEndpointNotificationCallback(this);
+                    _callbackEnumerator.UnregisterEndpointNotificationCallback(this);
                 }
                 catch
                 {
@@ -530,10 +540,12 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
                 _isCallbackRegistered = false;
             }
 
-            if (_ownsEnumerator)
+            if (_ownsCallbackEnumerator)
             {
-                SafeReleaseComObject(_deviceEnumerator);
+                SafeReleaseComObject(_callbackEnumerator);
             }
+
+            _callbackEnumerator = null;
         }
     }
 }
