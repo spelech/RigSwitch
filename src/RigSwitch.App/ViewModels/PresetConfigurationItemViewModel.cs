@@ -604,7 +604,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         item.PositionX = snappedX;
         item.PositionY = snappedY;
 
-        if (item.IsPrimary && (item.PositionX != 0 || item.PositionY != 0))
+        if (!_stageLayoutFrozen && item.IsPrimary && (item.PositionX != 0 || item.PositionY != 0))
         {
             SetPrimaryMonitor(item);
             return;
@@ -871,13 +871,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         UpdateCanvasLayoutPositions();
     }
 
-    public void UpdateCanvasLayoutPositions()
-    {
-        if (StageMonitors.Count == 0)
-        {
-            return;
-        }
+    private bool _stageLayoutFrozen;
+    private double _frozenScale;
+    private int _frozenMinX;
+    private int _frozenMinY;
+    private double _frozenPadLeft;
+    private double _frozenPadTop;
 
+    private (double Scale, int MinX, int MinY, double PadLeft, double PadTop) ComputeStageLayout()
+    {
         int minX = StageMonitors.Min(m => m.PositionX);
         int minY = StageMonitors.Min(m => m.PositionY);
         int maxX = StageMonitors.Max(m => m.PositionX + m.Width);
@@ -894,6 +896,68 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         double contentH = totalH * scale;
         double padLeft = Math.Max(14, (StageReferenceWidth - contentW) / 2.0);
         double padTop = Math.Max(12, (StageReferenceHeight - contentH) / 2.0);
+        return (scale, minX, minY, padLeft, padTop);
+    }
+
+    /// <summary>
+    /// Freezes the stage scale and origin for the duration of a drag and returns the
+    /// canvas-pixels-per-desktop-pixel scale to use for converting mouse deltas.
+    /// </summary>
+    public double BeginStageDrag()
+    {
+        if (StageMonitors.Count == 0)
+        {
+            return StageScaleFactor;
+        }
+
+        var layout = ComputeStageLayout();
+        _frozenScale = layout.Scale;
+        _frozenMinX = layout.MinX;
+        _frozenMinY = layout.MinY;
+        _frozenPadLeft = layout.PadLeft;
+        _frozenPadTop = layout.PadTop;
+        _stageLayoutFrozen = true;
+        return layout.Scale;
+    }
+
+    public void EndStageDrag()
+    {
+        if (!_stageLayoutFrozen)
+        {
+            return;
+        }
+
+        _stageLayoutFrozen = false;
+        var primary = StageMonitors.FirstOrDefault(m => m.IsPrimary);
+        if (primary != null && (primary.PositionX != 0 || primary.PositionY != 0))
+        {
+            SetPrimaryMonitor(primary);
+            return;
+        }
+
+        UpdateCanvasLayoutPositions();
+    }
+
+    public void UpdateCanvasLayoutPositions()
+    {
+        if (StageMonitors.Count == 0)
+        {
+            return;
+        }
+
+        double scale;
+        int minX;
+        int minY;
+        double padLeft;
+        double padTop;
+        if (_stageLayoutFrozen)
+        {
+            (scale, minX, minY, padLeft, padTop) = (_frozenScale, _frozenMinX, _frozenMinY, _frozenPadLeft, _frozenPadTop);
+        }
+        else
+        {
+            (scale, minX, minY, padLeft, padTop) = ComputeStageLayout();
+        }
 
         foreach (var mon in StageMonitors)
         {

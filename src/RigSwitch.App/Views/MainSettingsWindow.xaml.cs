@@ -17,6 +17,7 @@ public partial class MainSettingsWindow : Window
     private bool _isExplicitShutdown;
     private bool _isDraggingStageMonitor;
     private Point _dragStartPoint;
+    private double _dragStageScale = 0.052;
     private int _dragStartPosX;
     private int _dragStartPosY;
     private PresetMonitorCanvasItemViewModel? _draggedMonitorItem;
@@ -175,13 +176,15 @@ public partial class MainSettingsWindow : Window
 
     private void StageMonitor_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is FrameworkElement element && element.DataContext is PresetMonitorCanvasItemViewModel item)
+        if (sender is FrameworkElement element && element.DataContext is PresetMonitorCanvasItemViewModel item
+            && DataContext is MainSettingsViewModel vm && vm.SelectedPreset != null)
         {
             _isDraggingStageMonitor = true;
             _draggedMonitorItem = item;
             _dragStartPoint = e.GetPosition(this);
             _dragStartPosX = item.PositionX;
             _dragStartPosY = item.PositionY;
+            _dragStageScale = vm.SelectedPreset.BeginStageDrag();
             element.CaptureMouse();
             e.Handled = true;
         }
@@ -196,8 +199,7 @@ public partial class MainSettingsWindow : Window
 
         if (e.LeftButton != MouseButtonState.Pressed)
         {
-            _isDraggingStageMonitor = false;
-            _draggedMonitorItem = null;
+            EndStageMonitorDrag(sender as FrameworkElement);
             return;
         }
 
@@ -205,9 +207,9 @@ public partial class MainSettingsWindow : Window
         double deltaCanvasX = currentPos.X - _dragStartPoint.X;
         double deltaCanvasY = currentPos.Y - _dragStartPoint.Y;
 
-        // Convert canvas pixel delta (~0.052 scale) to desktop coordinate delta
-        int targetDesktopX = _dragStartPosX + (int)Math.Round(deltaCanvasX / 0.052);
-        int targetDesktopY = _dragStartPosY + (int)Math.Round(deltaCanvasY / 0.052);
+        // Convert canvas pixel delta to desktop coordinate delta using the stage scale frozen at drag start
+        int targetDesktopX = _dragStartPosX + (int)Math.Round(deltaCanvasX / _dragStageScale);
+        int targetDesktopY = _dragStartPosY + (int)Math.Round(deltaCanvasY / _dragStageScale);
 
         if (DataContext is MainSettingsViewModel vm && vm.SelectedPreset != null)
         {
@@ -217,12 +219,21 @@ public partial class MainSettingsWindow : Window
 
     private void StageMonitor_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_isDraggingStageMonitor && sender is FrameworkElement element)
+        if (_isDraggingStageMonitor)
         {
-            _isDraggingStageMonitor = false;
-            _draggedMonitorItem = null;
-            element.ReleaseMouseCapture();
+            EndStageMonitorDrag(sender as FrameworkElement);
             e.Handled = true;
+        }
+    }
+
+    private void EndStageMonitorDrag(FrameworkElement? element)
+    {
+        _isDraggingStageMonitor = false;
+        _draggedMonitorItem = null;
+        element?.ReleaseMouseCapture();
+        if (DataContext is MainSettingsViewModel vm)
+        {
+            vm.SelectedPreset?.EndStageDrag();
         }
     }
 
