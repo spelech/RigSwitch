@@ -422,6 +422,45 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private bool TryGetKnownResolution(string monitorId, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+
+        var settings = _settings;
+        if (settings == null)
+        {
+            return false;
+        }
+
+        if (settings.CachedDisplayResolutions.TryGetValue(monitorId, out var cached))
+        {
+            var parts = cached.Split('x');
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out width) &&
+                int.TryParse(parts[1], out height) &&
+                width > 0 && height > 0)
+            {
+                return true;
+            }
+        }
+
+        // Fall back to a placement saved in any preset (captured while the monitor was active).
+        var placement = settings.DeskPresets.Concat(settings.RigPresets)
+            .SelectMany(p => p.MonitorPlacements ?? [])
+            .FirstOrDefault(m => string.Equals(m.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase) && m.Width > 0 && m.Height > 0);
+        if (placement != null)
+        {
+            width = placement.Width;
+            height = placement.Height;
+            return true;
+        }
+
+        width = 0;
+        height = 0;
+        return false;
+    }
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         IsBusy = true;
@@ -447,15 +486,39 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             EnableAutoUpdateCheck = _settings.EnableAutoUpdateCheck;
             IgnoredReleaseVersion = _settings.IgnoredReleaseVersion;
 
-            var displays = await _displayService.EnumerateDisplaysAsync(cancellationToken);
+            var rawDisplays = await _displayService.EnumerateDisplaysAsync(cancellationToken);
+            var displays = new List<DisplayDeviceInfo>(rawDisplays.Count);
             DetectedDisplays.Clear();
-            foreach (var d in displays)
+            foreach (var raw in rawDisplays)
             {
-                DetectedDisplays.Add(d);
-                if (!string.IsNullOrWhiteSpace(d.FriendlyName))
+                var d = raw;
+                if (d.IsActive)
                 {
-                    _settings.CachedDeviceNames[d.MonitorId] = d.FriendlyName;
+                    _settings.CachedDisplayResolutions[d.MonitorId] = $"{d.Width}x{d.Height}";
+                    if (!string.IsNullOrWhiteSpace(d.FriendlyName))
+                    {
+                        _settings.CachedDeviceNames[d.MonitorId] = d.FriendlyName;
+                    }
                 }
+                else
+                {
+                    // Inactive displays report a generic name and default 1920x1080 mode; restore last-known values.
+                    int width = d.Width;
+                    int height = d.Height;
+                    if (TryGetKnownResolution(d.MonitorId, out int knownW, out int knownH))
+                    {
+                        width = knownW;
+                        height = knownH;
+                    }
+
+                    string name = _settings.CachedDeviceNames.TryGetValue(d.MonitorId, out var cachedName) && !string.IsNullOrWhiteSpace(cachedName)
+                        ? cachedName
+                        : d.FriendlyName;
+                    d = d with { Width = width, Height = height, FriendlyName = name };
+                }
+
+                displays.Add(d);
+                DetectedDisplays.Add(d);
             }
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
