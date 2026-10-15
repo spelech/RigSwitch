@@ -31,7 +31,7 @@ public sealed class AudioEndpointWatchdogServiceTests
             EDataFlow.eRender, ERole.eConsole, "{SHAKER-DAC}");
 
         // Allow debounce task to complete (poll to avoid flakiness on slow CI runners)
-        for (var i = 0; i < 100 && _director.ReceivedCalls().Count() == 0; i++)
+        for (var i = 0; i < 100 && !_director.ReceivedCalls().Any(); i++)
         {
             await Task.Delay(50);
         }
