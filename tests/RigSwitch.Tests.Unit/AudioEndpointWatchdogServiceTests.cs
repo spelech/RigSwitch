@@ -30,8 +30,11 @@ public sealed class AudioEndpointWatchdogServiceTests
         _provider.DefaultDeviceChanged += Raise.Event<Action<EDataFlow, ERole, string>>(
             EDataFlow.eRender, ERole.eConsole, "{SHAKER-DAC}");
 
-        // Allow debounce task to complete
-        await Task.Delay(350);
+        // Allow debounce task to complete (poll to avoid flakiness on slow CI runners)
+        for (var i = 0; i < 100 && _director.ReceivedCalls().Count() == 0; i++)
+        {
+            await Task.Delay(50);
+        }
 
         await _director.Received(1).SetDefaultPlaybackEndpointAsync("{SPEAKERS}", Arg.Any<CancellationToken>());
     }
