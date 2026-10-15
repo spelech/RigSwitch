@@ -63,6 +63,10 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
 
             bool isPathActive = (path.flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0;
             bool isPathPrimary = false;
+            int posX = 0;
+            int posY = 0;
+            int width = 1920;
+            int height = 1080;
 
             if (isPathActive &&
                 path.sourceInfo.modeInfoIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID &&
@@ -71,8 +75,19 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
                 var mode = modes[path.sourceInfo.modeInfoIdx];
                 if (mode.infoType == DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
                 {
-                    isPathPrimary = mode.modeInfo.sourceMode.position.x == 0 &&
-                                    mode.modeInfo.sourceMode.position.y == 0;
+                    posX = mode.modeInfo.sourceMode.position.x;
+                    posY = mode.modeInfo.sourceMode.position.y;
+                    if (mode.modeInfo.sourceMode.width > 0)
+                    {
+                        width = (int)mode.modeInfo.sourceMode.width;
+                    }
+
+                    if (mode.modeInfo.sourceMode.height > 0)
+                    {
+                        height = (int)mode.modeInfo.sourceMode.height;
+                    }
+
+                    isPathPrimary = posX == 0 && posY == 0;
                 }
             }
 
@@ -111,7 +126,11 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
                     isActive: existing.IsActive || isPathActive,
                     isPrimary: existing.IsPrimary || isPathPrimary,
                     supportsHdr: existing.SupportsHdr || supportsHdr,
-                    isHdrEnabled: existing.IsHdrEnabled || isHdrEnabled);
+                    isHdrEnabled: existing.IsHdrEnabled || isHdrEnabled,
+                    positionX: isPathActive ? posX : existing.PositionX,
+                    positionY: isPathActive ? posY : existing.PositionY,
+                    width: isPathActive ? width : existing.Width,
+                    height: isPathActive ? height : existing.Height);
             }
             else
             {
@@ -123,7 +142,11 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
                     isActive: isPathActive,
                     isPrimary: isPathPrimary,
                     supportsHdr: supportsHdr,
-                    isHdrEnabled: isHdrEnabled);
+                    isHdrEnabled: isHdrEnabled,
+                    positionX: posX,
+                    positionY: posY,
+                    width: width,
+                    height: height);
             }
         }
 
@@ -135,6 +158,14 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
     public Task ApplyDisplayTopologyAsync(
         IReadOnlyList<string> targetMonitorIds,
         IReadOnlyList<string>? inactiveMonitorIds = null,
+        CancellationToken cancellationToken = default) =>
+        ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, placements: null, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task ApplyDisplayTopologyAsync(
+        IReadOnlyList<string> targetMonitorIds,
+        IReadOnlyList<string>? inactiveMonitorIds,
+        IReadOnlyList<MonitorPlacement>? placements,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(targetMonitorIds);
@@ -240,7 +271,16 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
             }
         }
 
-        // Step 2: Enable target paths and arrange linearly (first target at (0,0) as primary)
+        // Step 2: Enable target paths and position according to explicit placements or linear fallback
+        int offsetX = 0;
+        int offsetY = 0;
+        if (placements is { Count: > 0 })
+        {
+            var primaryPlacement = placements.FirstOrDefault(p => p.IsPrimary) ?? placements[0];
+            offsetX = -primaryPlacement.PositionX;
+            offsetY = -primaryPlacement.PositionY;
+        }
+
         int currentX = 0;
         for (int tIdx = 0; tIdx < targetIndices.Count; tIdx++)
         {
@@ -250,7 +290,22 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
             uint modeIdx = clonedPaths[pIndex].sourceInfo.modeInfoIdx;
             if (modeIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID && modeIdx < clonedModes.Length)
             {
-                clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL { x = currentX, y = 0 };
+                var (monId, devPath, friendly) = pathTargetInfos[pIndex];
+                MonitorPlacement? matchedPlacement = placements?.FirstOrDefault(
+                    p => MatchesMonitor(p.MonitorId, monId, devPath, friendly));
+
+                if (matchedPlacement != null)
+                {
+                    clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL
+                    {
+                        x = matchedPlacement.PositionX + offsetX,
+                        y = matchedPlacement.PositionY + offsetY
+                    };
+                }
+                else
+                {
+                    clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL { x = currentX, y = 0 };
+                }
 
                 // If width is known and positive, advance currentX; otherwise increment by default width (1920)
                 int width = (int)clonedModes[modeIdx].modeInfo.sourceMode.width;

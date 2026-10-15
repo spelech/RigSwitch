@@ -24,6 +24,21 @@ public interface IDisplayConfigurationService
     Task ApplyDisplayTopologyAsync(IReadOnlyList<string> targetMonitorIds, IReadOnlyList<string>? inactiveMonitorIds = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Applies a display topology with optional explicit 2D monitor coordinate placements.
+    /// </summary>
+    /// <param name="targetMonitorIds">The list of hardware/EDID identifiers of monitors to activate.</param>
+    /// <param name="inactiveMonitorIds">The optional list of hardware/EDID identifiers of monitors to disable.</param>
+    /// <param name="placements">Optional 2D coordinate placements for each target monitor.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task ApplyDisplayTopologyAsync(
+        IReadOnlyList<string> targetMonitorIds,
+        IReadOnlyList<string>? inactiveMonitorIds,
+        IReadOnlyList<MonitorPlacement>? placements,
+        CancellationToken cancellationToken = default) =>
+        ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken);
+
+    /// <summary>
     /// Applies a single-display topology, activating the specified target display as primary and disabling the inactive display.
     /// </summary>
     /// <param name="targetMonitorId">The hardware/EDID identifier of the monitor to activate and make primary.</param>

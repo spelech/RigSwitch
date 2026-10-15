@@ -276,6 +276,19 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
         IReadOnlyList<string>? blacklisted,
         IReadOnlyList<AudioEndpointInfo>? renderEndpoints)
     {
+        if (activePreset.AudioPriorityIds is { Count: > 0 })
+        {
+            foreach (var candidateId in activePreset.AudioPriorityIds)
+            {
+                if (IsEndpointAvailable(candidateId, blacklisted, renderEndpoints))
+                {
+                    return candidateId;
+                }
+            }
+
+            return null;
+        }
+
         var preferredId = (mode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(activePreset.SecondaryAudioId))
             ? activePreset.SecondaryAudioId
             : activePreset.PrimaryAudioId;
