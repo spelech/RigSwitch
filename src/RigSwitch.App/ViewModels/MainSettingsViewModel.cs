@@ -79,11 +79,21 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(IsAudioPageSelected));
                 OnPropertyChanged(nameof(IsNicknamesPageSelected));
                 OnPropertyChanged(nameof(IsHotkeysPageSelected));
+
+                foreach (var p in DeskPresets)
+                {
+                    p.IsSelectedInNav = IsPresetViewSelected && ReferenceEquals(p, _selectedPreset);
+                }
+
+                foreach (var p in RigPresets)
+                {
+                    p.IsSelectedInNav = IsPresetViewSelected && ReferenceEquals(p, _selectedPreset);
+                }
             }
         }
     }
 
-    public bool IsPresetViewSelected => SelectedPageIndex == 0;
+    public bool IsPresetViewSelected => SelectedPageIndex == 0 || SelectedPageIndex == 1;
     public bool IsAudioPageSelected => SelectedPageIndex == 2;
     public bool IsNicknamesPageSelected => SelectedPageIndex == 3;
     public bool IsHotkeysPageSelected => SelectedPageIndex == 4;
@@ -144,6 +154,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             {
                 FilteredAudioEndpoints?.Refresh();
                 OnPropertyChanged(nameof(IsRelevantFilterSelected));
+                OnPropertyChanged(nameof(IsRegistryGhostsFilterSelected));
                 OnPropertyChanged(nameof(IsAllFilterSelected));
                 OnPropertyChanged(nameof(IsActiveFilterSelected));
                 OnPropertyChanged(nameof(IsInactiveFilterSelected));
@@ -163,6 +174,9 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             }
         }
     }
+
+    public bool IsRegistryGhostsFilterSelected =>
+        string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase);
 
     public bool IsAllFilterSelected
     {

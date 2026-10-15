@@ -179,7 +179,7 @@ public sealed class PresetMonitorCanvasItemViewModel : ViewModelBase
         set => SetProperty(ref _isOnStage, value);
     }
 
-    public string PrimaryBadgeText => IsPrimary ? "★ Primary (0,0)" : "☆ Make Primary";
+    public string PrimaryBadgeText => IsPrimary ? "★ Primary" : "☆ Primary";
 
     public string CoordinatesBadge => $"({PositionX}, {PositionY})";
 
@@ -189,9 +189,9 @@ public sealed class PresetMonitorCanvasItemViewModel : ViewModelBase
 
     public string HdrBadgeText => HdrMode switch
     {
-        PresetHdrMode.Enable => "HDR: Enable",
-        PresetHdrMode.Disable => "HDR: Disable",
-        _ => "HDR: Retain"
+        PresetHdrMode.Enable => "HDR: On",
+        PresetHdrMode.Disable => "HDR: Off",
+        _ => "HDR: Auto"
     };
 
     public string HdrBadgeBackground => HdrMode switch

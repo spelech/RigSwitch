@@ -13,8 +13,8 @@ using RigSwitch.Core.Models;
 public sealed class PresetConfigurationItemViewModel : ViewModelBase
 {
     private const double StageReferenceWidth = 520.0;
-    private const double StageReferenceHeight = 220.0;
-    private const double StageScaleFactor = 0.052;
+    private const double StageReferenceHeight = 164.0;
+    private const double StageScaleFactor = 0.056;
     private const int SnapThresholdPixels = 160;
 
     private readonly Action<PresetConfigurationItemViewModel>? _onActivated;
@@ -886,19 +886,19 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         int totalW = Math.Max(1920, maxX - minX);
         int totalH = Math.Max(1080, maxY - minY);
 
-        double scaleX = (StageReferenceWidth - 40) / totalW;
-        double scaleY = (StageReferenceHeight - 40) / totalH;
-        double scale = Math.Clamp(Math.Min(scaleX, scaleY), 0.028, StageScaleFactor);
+        double scaleX = (StageReferenceWidth - 36) / totalW;
+        double scaleY = (StageReferenceHeight - 28) / totalH;
+        double scale = Math.Clamp(Math.Min(scaleX, scaleY), 0.032, StageScaleFactor);
 
         double contentW = totalW * scale;
         double contentH = totalH * scale;
-        double padLeft = Math.Max(16, (StageReferenceWidth - contentW) / 2.0);
-        double padTop = Math.Max(16, (StageReferenceHeight - contentH) / 2.0);
+        double padLeft = Math.Max(14, (StageReferenceWidth - contentW) / 2.0);
+        double padTop = Math.Max(12, (StageReferenceHeight - contentH) / 2.0);
 
         foreach (var mon in StageMonitors)
         {
-            mon.CanvasWidth = Math.Max(96, Math.Round(mon.Width * scale));
-            mon.CanvasHeight = Math.Max(58, Math.Round(mon.Height * scale));
+            mon.CanvasWidth = Math.Max(124, Math.Round(mon.Width * scale));
+            mon.CanvasHeight = Math.Max(62, Math.Round(mon.Height * scale));
             mon.CanvasLeft = Math.Round(padLeft + ((mon.PositionX - minX) * scale));
             mon.CanvasTop = Math.Round(padTop + ((mon.PositionY - minY) * scale));
         }
