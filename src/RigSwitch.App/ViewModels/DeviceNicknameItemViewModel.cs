@@ -32,21 +32,29 @@ public sealed class DeviceNicknameItemViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets the command that removes this custom nickname and returns the device to the un-nicknamed pool.
+    /// </summary>
+    public System.Windows.Input.ICommand RemoveCommand { get; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="DeviceNicknameItemViewModel"/> class.
     /// </summary>
     /// <param name="deviceId">The device ID.</param>
     /// <param name="deviceType">The device type description.</param>
     /// <param name="hardwareName">The default hardware name.</param>
     /// <param name="customNickname">The user nickname.</param>
+    /// <param name="removeAction">Optional callback invoked when removing this nickname.</param>
     public DeviceNicknameItemViewModel(
         string deviceId,
         string deviceType,
         string hardwareName,
-        string customNickname)
+        string customNickname,
+        Action<DeviceNicknameItemViewModel>? removeAction = null)
     {
         DeviceId = deviceId;
         DeviceType = deviceType;
         HardwareName = hardwareName;
         CustomNickname = customNickname;
+        RemoveCommand = new RelayCommand(() => removeAction?.Invoke(this));
     }
 }
