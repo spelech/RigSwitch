@@ -59,6 +59,21 @@ public sealed record WorkstationPreset
     }
 
     /// <summary>
+    /// Gets or sets the spatial 2D placements for monitors enabled in this preset.
+    /// </summary>
+    public List<MonitorPlacement> MonitorPlacements { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the ordered priority list of playback audio endpoint device identifiers.
+    /// </summary>
+    public List<string> AudioPriorityIds { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the ordered priority list of microphone / capture endpoint device identifiers.
+    /// </summary>
+    public List<string> MicrophonePriorityIds { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the primary audio endpoint device identifier.
     /// </summary>
     public string PrimaryAudioId { get; set; } = string.Empty;
@@ -117,5 +132,51 @@ public sealed record WorkstationPreset
     /// Gets or sets application lifecycle hooks configured for this preset.
     /// </summary>
     public List<PresetApplicationHook> ApplicationHooks { get; set; } = [];
+
+    /// <summary>
+    /// Returns the ordered list of preferred playback audio endpoint identifiers, falling back to legacy Primary/Secondary/Fallback fields when <see cref="AudioPriorityIds"/> is empty.
+    /// </summary>
+    public IReadOnlyList<string> GetEffectiveAudioPriorityList() =>
+        ResolveRanking(AudioPriorityIds, PrimaryAudioId, SecondaryAudioId, FallbackAudioId);
+
+    /// <summary>
+    /// Returns the ordered list of preferred microphone endpoint identifiers, falling back to legacy Primary/Secondary/Fallback fields when <see cref="MicrophonePriorityIds"/> is empty.
+    /// </summary>
+    public IReadOnlyList<string> GetEffectiveMicrophonePriorityList() =>
+        ResolveRanking(MicrophonePriorityIds, PrimaryMicrophoneId, SecondaryMicrophoneId, FallbackMicrophoneId);
+
+    /// <summary>
+    /// Synchronizes the legacy <see cref="PrimaryAudioId"/>, <see cref="SecondaryAudioId"/>, and <see cref="FallbackAudioId"/> fields from <see cref="AudioPriorityIds"/>.
+    /// </summary>
+    public void SyncLegacyAudioFieldsFromPriorityList()
+    {
+        var list = GetEffectiveAudioPriorityList();
+        AudioPriorityIds = [.. list];
+        PrimaryAudioId = list.Count > 0 ? list[0] : string.Empty;
+        SecondaryAudioId = list.Count > 1 ? list[1] : string.Empty;
+        FallbackAudioId = list.Count > 2 ? list[2] : string.Empty;
+    }
+
+    /// <summary>
+    /// Synchronizes the legacy <see cref="PrimaryMicrophoneId"/>, <see cref="SecondaryMicrophoneId"/>, and <see cref="FallbackMicrophoneId"/> fields from <see cref="MicrophonePriorityIds"/>.
+    /// </summary>
+    public void SyncLegacyMicrophoneFieldsFromPriorityList()
+    {
+        var list = GetEffectiveMicrophonePriorityList();
+        MicrophonePriorityIds = [.. list];
+        PrimaryMicrophoneId = list.Count > 0 ? list[0] : string.Empty;
+        SecondaryMicrophoneId = list.Count > 1 ? list[1] : string.Empty;
+        FallbackMicrophoneId = list.Count > 2 ? list[2] : string.Empty;
+    }
+
+    private static List<string> ResolveRanking(List<string>? explicitList, params string?[] legacy)
+    {
+        IEnumerable<string?> source = explicitList is { Count: > 0 } ? explicitList : legacy;
+        return source
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 }
 

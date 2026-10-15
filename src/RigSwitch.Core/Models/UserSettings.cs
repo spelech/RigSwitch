@@ -199,6 +199,19 @@ public sealed record UserSettings
 
     private Dictionary<string, string> _customDeviceNames = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _cachedDeviceNames = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _cachedDisplayResolutions = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets or sets the last-known resolution ("WIDTHxHEIGHT") of each display, recorded while it was active.
+    /// Windows reports no real mode for inactive (disabled) displays, so this preserves their true size.
+    /// </summary>
+    public Dictionary<string, string> CachedDisplayResolutions
+    {
+        get => _cachedDisplayResolutions;
+        set => _cachedDisplayResolutions = value != null
+            ? new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Gets or sets user-defined friendly name overrides keyed by device identifier.
