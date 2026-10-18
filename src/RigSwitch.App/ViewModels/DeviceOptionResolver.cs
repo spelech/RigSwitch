@@ -65,15 +65,34 @@ internal static partial class DeviceOptionResolver
     }
 
     /// <summary>
-    /// Filters an audio endpoint item based on search text and presence state filter selection.
+    /// Filters an audio endpoint item based on search text, presence state filter selection, and optional referenced IDs.
     /// </summary>
-    public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection)
+    public static bool MatchesAudioFilter(
+        AudioEndpointVisibilityItemViewModel item,
+        string searchText,
+        string filterSelection,
+        IEnumerable<string>? referencedIds = null)
     {
         if (!string.IsNullOrWhiteSpace(searchText))
         {
             bool nameMatch = item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase);
             bool adapterMatch = item.Adapter.Contains(searchText, StringComparison.OrdinalIgnoreCase);
             if (!nameMatch && !adapterMatch) return false;
+        }
+
+        if (string.Equals(filterSelection, "Relevant", StringComparison.OrdinalIgnoreCase))
+        {
+            if (item.State != DevicePresenceState.NotPresent)
+            {
+                return true;
+            }
+
+            if (item.IsBlacklisted || !item.IsVisible)
+            {
+                return true;
+            }
+
+            return referencedIds != null && referencedIds.Any(rId => MatchesEndpoint(rId, item.Id));
         }
 
         if (string.Equals(filterSelection, "Active", StringComparison.OrdinalIgnoreCase))
@@ -90,6 +109,49 @@ internal static partial class DeviceOptionResolver
             return item.State != DevicePresenceState.Active;
 
         return true;
+    }
+
+    /// <summary>
+    /// Collects all device IDs referenced across presets, blacklists, hidden endpoints, and custom nicknames.
+    /// </summary>
+    public static HashSet<string> CollectReferencedDeviceIds(UserSettings? settings)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (settings == null)
+        {
+            return ids;
+        }
+
+        void AddIfNotEmpty(string? id)
+        {
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                ids.Add(id);
+            }
+        }
+
+        AddIfNotEmpty(settings.DeskMonitorId);
+        AddIfNotEmpty(settings.RigMonitorId);
+        AddIfNotEmpty(settings.DeskPrimaryAudioId);
+        AddIfNotEmpty(settings.DeskFallbackAudioId);
+        AddIfNotEmpty(settings.RigPrimaryAudioId);
+
+        foreach (var b in settings.BlacklistedAudioEndpointIds) AddIfNotEmpty(b);
+        foreach (var h in settings.HiddenAudioEndpointIds) AddIfNotEmpty(h);
+        foreach (var (k, v) in settings.CustomDeviceNames)
+        {
+            if (!string.IsNullOrWhiteSpace(v)) AddIfNotEmpty(k);
+        }
+
+        foreach (var preset in settings.DeskPresets.Concat(settings.RigPresets))
+        {
+            foreach (var m in preset.TargetMonitorIds) AddIfNotEmpty(m);
+            foreach (var p in preset.MonitorPlacements) AddIfNotEmpty(p.MonitorId);
+            foreach (var a in preset.GetEffectiveAudioPriorityList()) AddIfNotEmpty(a);
+            foreach (var mic in preset.GetEffectiveMicrophonePriorityList()) AddIfNotEmpty(mic);
+        }
+
+        return ids;
     }
 
     /// <summary>

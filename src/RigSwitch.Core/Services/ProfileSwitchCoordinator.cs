@@ -15,6 +15,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     private readonly IAudioEndpointDirector _audioDirector;
     private readonly ISettingsStorageService _settingsStorageService;
     private readonly IApplicationLifecycleHookService? _appHookService;
+    private readonly Action<string>? _onIntentionalAudioSwitch;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
     private UserSettings? _settings;
@@ -27,12 +28,14 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     /// <param name="settingsStorageService">The settings storage service.</param>
     /// <param name="initialProfile">The initial workstation profile mode.</param>
     /// <param name="appHookService">Optional application lifecycle hook service.</param>
+    /// <param name="onIntentionalAudioSwitch">Optional callback invoked with the resolved endpoint ID immediately before switching playback audio.</param>
     public ProfileSwitchCoordinator(
         IDisplayConfigurationService displayConfigService,
         IAudioEndpointDirector audioDirector,
         ISettingsStorageService settingsStorageService,
         ProfileMode initialProfile = ProfileMode.Desk,
-        IApplicationLifecycleHookService? appHookService = null)
+        IApplicationLifecycleHookService? appHookService = null,
+        Action<string>? onIntentionalAudioSwitch = null)
     {
         ArgumentNullException.ThrowIfNull(displayConfigService);
         ArgumentNullException.ThrowIfNull(audioDirector);
@@ -42,6 +45,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         _audioDirector = audioDirector;
         _settingsStorageService = settingsStorageService;
         _appHookService = appHookService;
+        _onIntentionalAudioSwitch = onIntentionalAudioSwitch;
         CurrentProfile = initialProfile;
     }
 
@@ -111,20 +115,39 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
             var captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
-            var targetAudioId = newMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
-                ? preset.SecondaryAudioId
-                : preset.PrimaryAudioId;
-            var targetMicId = newMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryMicrophoneId)
-                ? preset.SecondaryMicrophoneId
-                : preset.PrimaryMicrophoneId;
+            string? resolvedAudioId;
+            string? resolvedMicId;
 
-            var resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
+            if (preset.AudioPriorityIds is { Count: > 0 })
+            {
+                resolvedAudioId = ResolveNextCycledRankedEndpoint(preset.AudioPriorityIds, playbackEndpoints, blacklisted, isPlayback: true);
+            }
+            else
+            {
+                var targetAudioId = newMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
+                    ? preset.SecondaryAudioId
+                    : preset.PrimaryAudioId;
+                resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
+            }
+
+            if (preset.MicrophonePriorityIds is { Count: > 0 })
+            {
+                resolvedMicId = ResolveNextCycledRankedEndpoint(preset.MicrophonePriorityIds, captureEndpoints, blacklisted, isPlayback: false);
+            }
+            else
+            {
+                var targetMicId = newMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryMicrophoneId)
+                    ? preset.SecondaryMicrophoneId
+                    : preset.PrimaryMicrophoneId;
+                resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted);
+            }
+
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
             {
+                _onIntentionalAudioSwitch?.Invoke(resolvedAudioId);
                 await _audioDirector.SetDefaultPlaybackEndpointAsync(resolvedAudioId, cancellationToken).ConfigureAwait(false);
             }
 
-            var resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted);
             if (!string.IsNullOrWhiteSpace(resolvedMicId))
             {
                 await _audioDirector.SetDefaultCaptureEndpointAsync(resolvedMicId, cancellationToken).ConfigureAwait(false);
@@ -179,6 +202,16 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var inactiveMonitorIds = inactivePreset.TargetMonitorIds;
 
             var targetMonitorIds = preset.TargetMonitorIds.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            if (targetMonitorIds.Count == 0 && preset.MonitorPlacements is { Count: > 0 })
+            {
+                var orderedPlacements = preset.MonitorPlacements
+                    .OrderByDescending(p => p.IsPrimary)
+                    .Where(p => !string.IsNullOrWhiteSpace(p.MonitorId))
+                    .Select(p => p.MonitorId)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                targetMonitorIds = orderedPlacements;
+            }
 
             // Step 2: Safety Gate (Reachability Verification)
             if (targetMonitorIds.Count == 0)
@@ -199,14 +232,26 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             }
 
             // Step 3: Apply Display Topology
-            await _displayConfigService.ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken).ConfigureAwait(false);
-
-            // Step 3B: Apply Native HDR Mode (if configured)
-            if (preset.HdrMode != PresetHdrMode.Retain)
+            if (preset.MonitorPlacements is { Count: > 0 })
             {
-                bool enableHdr = preset.HdrMode == PresetHdrMode.Enable;
-                foreach (var monitorId in targetMonitorIds)
+                await _displayConfigService.ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, preset.MonitorPlacements, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await _displayConfigService.ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken).ConfigureAwait(false);
+            }
+
+            // Step 3B: Apply Native HDR Mode (per-monitor placement or preset-level)
+            foreach (var monitorId in targetMonitorIds)
+            {
+                var placementHdr = preset.MonitorPlacements?.FirstOrDefault(p => string.Equals(p.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase))?.HdrMode;
+                var effectiveHdrMode = placementHdr is not null && placementHdr != PresetHdrMode.Retain
+                    ? placementHdr.Value
+                    : preset.HdrMode;
+
+                if (effectiveHdrMode != PresetHdrMode.Retain)
                 {
+                    bool enableHdr = effectiveHdrMode == PresetHdrMode.Enable;
                     try
                     {
                         await _displayConfigService.SetHdrStateAsync(monitorId, enableHdr, cancellationToken).ConfigureAwait(false);
@@ -217,12 +262,12 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Trace.TraceWarning($"Failed to apply HDR mode ({preset.HdrMode}) on monitor '{monitorId}': {ex.Message}");
+                        System.Diagnostics.Trace.TraceWarning($"Failed to apply HDR mode ({effectiveHdrMode}) on monitor '{monitorId}': {ex.Message}");
                     }
                 }
             }
 
-            // Step 4: Multi-tier Audio Resolution & Routing
+            // Step 4: Multi-tier / Ranked Audio Resolution & Routing
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
             var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
             var blacklisted = settings.BlacklistedAudioEndpointIds ?? [];
@@ -230,20 +275,38 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
             var captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
-            var targetAudioId = settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
-                ? preset.SecondaryAudioId
-                : preset.PrimaryAudioId;
-            var targetMicId = settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryMicrophoneId)
-                ? preset.SecondaryMicrophoneId
-                : preset.PrimaryMicrophoneId;
+            string? resolvedAudioId;
+            if (preset.AudioPriorityIds is { Count: > 0 })
+            {
+                resolvedAudioId = ResolveRankedAudioEndpoint(preset.AudioPriorityIds, playbackEndpoints, blacklisted);
+            }
+            else
+            {
+                var targetAudioId = settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
+                    ? preset.SecondaryAudioId
+                    : preset.PrimaryAudioId;
+                resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
+            }
 
-            var resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
             {
+                _onIntentionalAudioSwitch?.Invoke(resolvedAudioId);
                 await _audioDirector.SetDefaultPlaybackEndpointAsync(resolvedAudioId, cancellationToken).ConfigureAwait(false);
             }
 
-            var resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted);
+            string? resolvedMicId;
+            if (preset.MicrophonePriorityIds is { Count: > 0 })
+            {
+                resolvedMicId = ResolveRankedAudioEndpoint(preset.MicrophonePriorityIds, captureEndpoints, blacklisted);
+            }
+            else
+            {
+                var targetMicId = settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryMicrophoneId)
+                    ? preset.SecondaryMicrophoneId
+                    : preset.PrimaryMicrophoneId;
+                resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted);
+            }
+
             if (!string.IsNullOrWhiteSpace(resolvedMicId))
             {
                 await _audioDirector.SetDefaultCaptureEndpointAsync(resolvedMicId, cancellationToken).ConfigureAwait(false);
@@ -382,6 +445,75 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         {
             _gate.Release();
         }
+    }
+
+    private static string? ResolveRankedAudioEndpoint(
+        IReadOnlyList<string> rankedIds,
+        IList<AudioEndpointInfo> allowedEndpoints,
+        IReadOnlyList<string>? blacklisted = null)
+    {
+        foreach (var candidateId in rankedIds)
+        {
+            if (string.IsNullOrWhiteSpace(candidateId))
+            {
+                continue;
+            }
+
+            if (blacklisted?.Any(b => MatchesEndpoint(b, candidateId)) == true)
+            {
+                continue;
+            }
+
+            var activeMatch = allowedEndpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, candidateId) && e.State == DevicePresenceState.Active);
+            if (activeMatch != null)
+            {
+                return activeMatch.Id;
+            }
+        }
+
+        var firstActive = allowedEndpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active);
+        return firstActive?.Id;
+    }
+
+    private static string? ResolveNextCycledRankedEndpoint(
+        IReadOnlyList<string> rankedIds,
+        IList<AudioEndpointInfo> allowedEndpoints,
+        IReadOnlyList<string>? blacklisted,
+        bool isPlayback)
+    {
+        var activeRanked = new List<AudioEndpointInfo>();
+        foreach (var candidateId in rankedIds)
+        {
+            if (string.IsNullOrWhiteSpace(candidateId))
+            {
+                continue;
+            }
+
+            if (blacklisted?.Any(b => MatchesEndpoint(b, candidateId)) == true)
+            {
+                continue;
+            }
+
+            var match = allowedEndpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, candidateId) && e.State == DevicePresenceState.Active);
+            if (match != null && !activeRanked.Any(x => MatchesEndpoint(x.Id, match.Id)))
+            {
+                activeRanked.Add(match);
+            }
+        }
+
+        if (activeRanked.Count == 0)
+        {
+            return null;
+        }
+
+        if (activeRanked.Count == 1)
+        {
+            return activeRanked[0].Id;
+        }
+
+        int currentIdx = activeRanked.FindIndex(e => isPlayback ? e.IsDefaultPlayback : e.IsDefaultCapture);
+        int nextIdx = currentIdx >= 0 ? (currentIdx + 1) % activeRanked.Count : 0;
+        return activeRanked[nextIdx].Id;
     }
 
     private static string? ResolveAudioEndpoint(

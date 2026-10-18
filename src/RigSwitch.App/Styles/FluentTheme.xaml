@@ -557,6 +557,32 @@
         </Setter>
     </Style>
 
+    <!-- Relevant Devices Filter Button Style (High Contrast Crisp Slate Highlight) -->
+    <Style x:Key="FluentFilterRelevantButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentSegmentFilterButton}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsRelevantFilterSelected}" Value="True">
+                <Setter Property="Background" Value="#444752" />
+                <Setter Property="BorderBrush" Value="#7A8092" />
+                <Setter Property="BorderThickness" Value="1.5" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- All Registry Ghosts Filter Button Style -->
+    <Style x:Key="FluentFilterRegistryGhostsButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentSegmentFilterButton}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsRegistryGhostsFilterSelected}" Value="True">
+                <Setter Property="Background" Value="#444752" />
+                <Setter Property="BorderBrush" Value="#7A8092" />
+                <Setter Property="BorderThickness" Value="1.5" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- All Devices Filter Button Style (High Contrast Crisp Slate Highlight) -->
     <Style x:Key="FluentFilterAllButton" TargetType="{x:Type Button}" BasedOn="{StaticResource FluentSegmentFilterButton}">
         <Style.Triggers>

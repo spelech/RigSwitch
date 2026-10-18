@@ -1,6 +1,7 @@
 namespace RigSwitch.App.ViewModels;
 
 using System.Collections.ObjectModel;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -13,7 +14,7 @@ using RigSwitch.Core.Models;
 using RigSwitch.Infrastructure.Services;
 
 /// <summary>
-/// Primary view model orchestrating hardware profiles, device renaming, audio visibility, update checks, and preferences.
+/// Primary view model orchestrating hardware profiles, per-preset 2D topology &amp; ranked audio routing, device nicknames, audio visibility, update checks, and preferences.
 /// </summary>
 public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 {
@@ -47,6 +48,14 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     private string _ignoredReleaseVersion = string.Empty;
     private bool _disposed;
     private List<AudioEndpointInfo> _cachedRawAudioEndpoints = [];
+    private HashSet<string> _referencedDeviceIds = new(StringComparer.OrdinalIgnoreCase);
+
+    private PresetConfigurationItemViewModel? _selectedPreset;
+    private int _selectedPageIndex;
+    private string _selectedNewNicknameDeviceId = string.Empty;
+    private string _newNicknameText = string.Empty;
+
+    public string AppVersionText { get; } = ResolveAppVersionText();
 
     public ObservableCollection<DisplayDeviceInfo> DetectedDisplays { get; } = [];
     public ObservableCollection<AudioEndpointInfo> DetectedAudioEndpoints { get; } = [];
@@ -54,8 +63,72 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<DeviceSelectionOption> AvailableAudioOptions { get; } = [];
     public ObservableCollection<DeviceSelectionOption> AvailableMicrophoneOptions { get; } = [];
     public ObservableCollection<DeviceNicknameItemViewModel> DeviceNicknames { get; } = [];
+    public ObservableCollection<DeviceNicknameItemViewModel> ConfiguredNicknames { get; } = [];
+    public ObservableCollection<DeviceSelectionOption> UnnicknamedDeviceOptions { get; } = [];
     public ObservableCollection<AudioEndpointVisibilityItemViewModel> AudioEndpointsVisibility { get; } = [];
     public System.ComponentModel.ICollectionView? FilteredAudioEndpoints { get; private set; }
+
+    public int SelectedPageIndex
+    {
+        get => _selectedPageIndex;
+        set
+        {
+            if (SetProperty(ref _selectedPageIndex, value))
+            {
+                OnPropertyChanged(nameof(IsPresetViewSelected));
+                OnPropertyChanged(nameof(IsAudioPageSelected));
+                OnPropertyChanged(nameof(IsNicknamesPageSelected));
+                OnPropertyChanged(nameof(IsHotkeysPageSelected));
+
+                foreach (var p in DeskPresets)
+                {
+                    p.IsSelectedInNav = IsPresetViewSelected && ReferenceEquals(p, _selectedPreset);
+                }
+
+                foreach (var p in RigPresets)
+                {
+                    p.IsSelectedInNav = IsPresetViewSelected && ReferenceEquals(p, _selectedPreset);
+                }
+            }
+        }
+    }
+
+    public bool IsPresetViewSelected => SelectedPageIndex == 0 || SelectedPageIndex == 1;
+    public bool IsAudioPageSelected => SelectedPageIndex == 2;
+    public bool IsNicknamesPageSelected => SelectedPageIndex == 3;
+    public bool IsHotkeysPageSelected => SelectedPageIndex == 4;
+
+    public PresetConfigurationItemViewModel? SelectedPreset
+    {
+        get => _selectedPreset;
+        set
+        {
+            if (SetProperty(ref _selectedPreset, value))
+            {
+                foreach (var p in DeskPresets)
+                {
+                    p.IsSelectedInNav = IsPresetViewSelected && ReferenceEquals(p, value);
+                }
+
+                foreach (var p in RigPresets)
+                {
+                    p.IsSelectedInNav = IsPresetViewSelected && ReferenceEquals(p, value);
+                }
+            }
+        }
+    }
+
+    public string SelectedNewNicknameDeviceId
+    {
+        get => _selectedNewNicknameDeviceId;
+        set => SetProperty(ref _selectedNewNicknameDeviceId, value ?? string.Empty);
+    }
+
+    public string NewNicknameText
+    {
+        get => _newNicknameText;
+        set => SetProperty(ref _newNicknameText, value ?? string.Empty);
+    }
 
     private string _audioSearchText = string.Empty;
     public string AudioSearchText
@@ -71,7 +144,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private string _audioFilterSelection = "All";
+    private string _audioFilterSelection = "Relevant";
     public string AudioFilterSelection
     {
         get => _audioFilterSelection;
@@ -80,6 +153,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref _audioFilterSelection, value))
             {
                 FilteredAudioEndpoints?.Refresh();
+                OnPropertyChanged(nameof(IsRelevantFilterSelected));
+                OnPropertyChanged(nameof(IsRegistryGhostsFilterSelected));
                 OnPropertyChanged(nameof(IsAllFilterSelected));
                 OnPropertyChanged(nameof(IsActiveFilterSelected));
                 OnPropertyChanged(nameof(IsInactiveFilterSelected));
@@ -88,9 +163,25 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool IsRelevantFilterSelected
+    {
+        get => string.Equals(AudioFilterSelection, "Relevant", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value)
+            {
+                AudioFilterSelection = "Relevant";
+            }
+        }
+    }
+
+    public bool IsRegistryGhostsFilterSelected =>
+        string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase);
+
     public bool IsAllFilterSelected
     {
-        get => string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase);
+        get => string.Equals(AudioFilterSelection, "All", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(AudioFilterSelection, "Relevant", StringComparison.OrdinalIgnoreCase);
         set
         {
             if (value)
@@ -134,22 +225,27 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             int total = AudioEndpointsVisibility.Count;
             int active = AudioEndpointsVisibility.Count(e => e.State == RigSwitch.Core.Enums.DevicePresenceState.Active);
             int inactive = AudioEndpointsVisibility.Count(e => e.State != RigSwitch.Core.Enums.DevicePresenceState.Active);
+            int relevant = AudioEndpointsVisibility.Count(e => MatchesAudioFilter(e, string.Empty, "Relevant", _referencedDeviceIds));
 
             string modeLabel = IsActiveFilterSelected
                 ? "Active Only"
                 : IsInactiveFilterSelected
                     ? "Disabled / Unplugged"
-                    : "All Devices";
+                    : IsRelevantFilterSelected
+                        ? "All Relevant Devices"
+                        : "All Registry Ghosts";
 
             int matchingCount = IsActiveFilterSelected
                 ? active
                 : IsInactiveFilterSelected
                     ? inactive
-                    : total;
+                    : IsRelevantFilterSelected
+                        ? relevant
+                        : total;
 
             if (!string.IsNullOrWhiteSpace(AudioSearchText))
             {
-                int searchMatches = AudioEndpointsVisibility.Count(e => MatchesAudioFilter(e, AudioSearchText, AudioFilterSelection));
+                int searchMatches = AudioEndpointsVisibility.Count(e => MatchesAudioFilter(e, AudioSearchText, AudioFilterSelection, _referencedDeviceIds));
                 return $"Showing {modeLabel} • {searchMatches} of {total} endpoints matching \"{AudioSearchText}\"";
             }
 
@@ -157,11 +253,21 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public ICommand SelectRelevantAudioFilterCommand { get; }
     public ICommand SelectAllAudioFilterCommand { get; }
     public ICommand SelectActiveAudioFilterCommand { get; }
     public ICommand SelectInactiveAudioFilterCommand { get; }
+    public ICommand NavigateToPresetCommand { get; }
+    public ICommand NavigateToSystemPageCommand { get; }
+    public ICommand AddNicknameCommand { get; }
+    public ICommand RemoveNicknameCommand { get; }
 
-    public static bool MatchesAudioFilter(AudioEndpointVisibilityItemViewModel item, string searchText, string filterSelection) => DeviceOptionResolver.MatchesAudioFilter(item, searchText, filterSelection);
+    public static bool MatchesAudioFilter(
+        AudioEndpointVisibilityItemViewModel item,
+        string searchText,
+        string filterSelection,
+        IEnumerable<string>? referencedIds = null) =>
+        DeviceOptionResolver.MatchesAudioFilter(item, searchText, filterSelection, referencedIds);
 
     public ObservableCollection<PresetConfigurationItemViewModel> DeskPresets { get; } = [];
     public ObservableCollection<PresetConfigurationItemViewModel> RigPresets { get; } = [];
@@ -244,15 +350,115 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         IdentifyMonitorsCommand = new RelayCommand(IdentifyMonitors);
         CheckForUpdatesCommand = new AsyncRelayCommand(() => CheckForUpdatesManualAsync(), () => !IsBusy);
 
+        SelectRelevantAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Relevant");
         SelectAllAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "All");
         SelectActiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Active");
         SelectInactiveAudioFilterCommand = new RelayCommand(() => AudioFilterSelection = "Inactive");
 
+        NavigateToPresetCommand = new RelayCommand(param =>
+        {
+            if (param is PresetConfigurationItemViewModel presetVm)
+            {
+                SelectPresetForNavigation(presetVm);
+            }
+        });
+
+        NavigateToSystemPageCommand = new RelayCommand(param =>
+        {
+            if (param is string pageTag && int.TryParse(pageTag, out int pageIdx))
+            {
+                NavigateToSystemPage(pageIdx);
+            }
+            else if (param is int idx)
+            {
+                NavigateToSystemPage(idx);
+            }
+        });
+
+        AddNicknameCommand = new RelayCommand(AddNewNickname);
+        RemoveNicknameCommand = new RelayCommand(param =>
+        {
+            if (param is DeviceNicknameItemViewModel item)
+            {
+                RemoveNickname(item);
+            }
+        });
+
         FilteredAudioEndpoints = CollectionViewSource.GetDefaultView(AudioEndpointsVisibility);
         if (FilteredAudioEndpoints != null)
         {
-            FilteredAudioEndpoints.Filter = item => item is AudioEndpointVisibilityItemViewModel endpoint && MatchesAudioFilter(endpoint, AudioSearchText, AudioFilterSelection);
+            FilteredAudioEndpoints.Filter = item =>
+                item is AudioEndpointVisibilityItemViewModel endpoint &&
+                MatchesAudioFilter(endpoint, AudioSearchText, AudioFilterSelection, _referencedDeviceIds);
         }
+    }
+
+    public void SelectPresetForNavigation(PresetConfigurationItemViewModel presetVm)
+    {
+        SelectedPageIndex = 0;
+        SelectedPreset = presetVm;
+        foreach (var p in DeskPresets)
+        {
+            p.IsSelectedInNav = ReferenceEquals(p, presetVm);
+        }
+
+        foreach (var p in RigPresets)
+        {
+            p.IsSelectedInNav = ReferenceEquals(p, presetVm);
+        }
+    }
+
+    public void NavigateToSystemPage(int pageIndex)
+    {
+        SelectedPageIndex = pageIndex;
+        foreach (var p in DeskPresets)
+        {
+            p.IsSelectedInNav = false;
+        }
+
+        foreach (var p in RigPresets)
+        {
+            p.IsSelectedInNav = false;
+        }
+    }
+
+    private bool TryGetKnownResolution(string monitorId, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+
+        var settings = _settings;
+        if (settings == null)
+        {
+            return false;
+        }
+
+        if (settings.CachedDisplayResolutions.TryGetValue(monitorId, out var cached))
+        {
+            var parts = cached.Split('x');
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out width) &&
+                int.TryParse(parts[1], out height) &&
+                width > 0 && height > 0)
+            {
+                return true;
+            }
+        }
+
+        // Fall back to a placement saved in any preset (captured while the monitor was active).
+        var placement = settings.DeskPresets.Concat(settings.RigPresets)
+            .SelectMany(p => p.MonitorPlacements ?? [])
+            .FirstOrDefault(m => string.Equals(m.MonitorId, monitorId, StringComparison.OrdinalIgnoreCase) && m.Width > 0 && m.Height > 0);
+        if (placement != null)
+        {
+            width = placement.Width;
+            height = placement.Height;
+            return true;
+        }
+
+        width = 0;
+        height = 0;
+        return false;
     }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -280,15 +486,39 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
             EnableAutoUpdateCheck = _settings.EnableAutoUpdateCheck;
             IgnoredReleaseVersion = _settings.IgnoredReleaseVersion;
 
-            var displays = await _displayService.EnumerateDisplaysAsync(cancellationToken);
+            var rawDisplays = await _displayService.EnumerateDisplaysAsync(cancellationToken);
+            var displays = new List<DisplayDeviceInfo>(rawDisplays.Count);
             DetectedDisplays.Clear();
-            foreach (var d in displays)
+            foreach (var raw in rawDisplays)
             {
-                DetectedDisplays.Add(d);
-                if (!string.IsNullOrWhiteSpace(d.FriendlyName))
+                var d = raw;
+                if (d.IsActive)
                 {
-                    _settings.CachedDeviceNames[d.MonitorId] = d.FriendlyName;
+                    _settings.CachedDisplayResolutions[d.MonitorId] = $"{d.Width}x{d.Height}";
+                    if (!string.IsNullOrWhiteSpace(d.FriendlyName))
+                    {
+                        _settings.CachedDeviceNames[d.MonitorId] = d.FriendlyName;
+                    }
                 }
+                else
+                {
+                    // Inactive displays report a generic name and default 1920x1080 mode; restore last-known values.
+                    int width = d.Width;
+                    int height = d.Height;
+                    if (TryGetKnownResolution(d.MonitorId, out int knownW, out int knownH))
+                    {
+                        width = knownW;
+                        height = knownH;
+                    }
+
+                    string name = _settings.CachedDeviceNames.TryGetValue(d.MonitorId, out var cachedName) && !string.IsNullOrWhiteSpace(cachedName)
+                        ? cachedName
+                        : d.FriendlyName;
+                    d = d with { Width = width, Height = height, FriendlyName = name };
+                }
+
+                displays.Add(d);
+                DetectedDisplays.Add(d);
             }
 
             var audioEndpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken);
@@ -305,6 +535,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     _settings.CachedDeviceNames[a.Id] = a.Name;
                 }
             }
+
+            _referencedDeviceIds = DeviceOptionResolver.CollectReferencedDeviceIds(_settings);
 
             AvailableDisplayOptions.Clear();
             AvailableDisplayOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Display (Unassigned) —"));
@@ -335,7 +567,18 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 preset.PrimaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.SecondaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.SecondaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
-                DeskPresets.Add(new PresetConfigurationItemViewModel(preset, i, "DeskActivePreset", i == _settings.ActiveDeskPresetIndex, OnDeskPresetActivated));
+
+                var presetVm = new PresetConfigurationItemViewModel(
+                    preset,
+                    i,
+                    "DeskActivePreset",
+                    i == _settings.ActiveDeskPresetIndex,
+                    OnDeskPresetActivated,
+                    profile: ProfileMode.Desk,
+                    onActivateNow: p => _ = ActivatePresetNowAsync(ProfileMode.Desk, p.PresetIndex),
+                    onIdentifyMonitors: IdentifyMonitors);
+                presetVm.HydrateHardwareContext(displays, _cachedRawAudioEndpoints, _settings.CustomDeviceNames, _settings.CachedDeviceNames, _settings.BlacklistedAudioEndpointIds);
+                DeskPresets.Add(presetVm);
             }
 
             RigPresets.Clear();
@@ -349,31 +592,42 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 preset.PrimaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.PrimaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.SecondaryMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.SecondaryMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
                 preset.FallbackMicrophoneId = DeviceOptionResolver.ResolveAudioOption(preset.FallbackMicrophoneId, audioEndpoints, AvailableMicrophoneOptions, _settings.CustomDeviceNames, _settings.CachedDeviceNames);
-                RigPresets.Add(new PresetConfigurationItemViewModel(preset, i, "RigActivePreset", i == _settings.ActiveRigPresetIndex, OnRigPresetActivated));
+
+                var presetVm = new PresetConfigurationItemViewModel(
+                    preset,
+                    i,
+                    "RigActivePreset",
+                    i == _settings.ActiveRigPresetIndex,
+                    OnRigPresetActivated,
+                    profile: ProfileMode.SimRig,
+                    onActivateNow: p => _ = ActivatePresetNowAsync(ProfileMode.SimRig, p.PresetIndex),
+                    onIdentifyMonitors: IdentifyMonitors);
+                presetVm.HydrateHardwareContext(displays, _cachedRawAudioEndpoints, _settings.CustomDeviceNames, _settings.CachedDeviceNames, _settings.BlacklistedAudioEndpointIds);
+                RigPresets.Add(presetVm);
             }
 
-            DeviceNicknames.Clear();
-            var seenNicknameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var d in displays)
+            if (SelectedPreset == null)
             {
-                DeviceNicknames.Add(new DeviceNicknameItemViewModel(d.MonitorId, "Display", d.FriendlyName, _settings.CustomDeviceNames.GetValueOrDefault(d.MonitorId, string.Empty)));
-                seenNicknameIds.Add(d.MonitorId);
-            }
-            foreach (var a in audioEndpoints)
-            {
-                string kind = a.Flow == AudioDeviceFlow.Capture ? "Microphone / Input" : "Audio Playback";
-                DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, kind, a.Name, _settings.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty)));
-                seenNicknameIds.Add(a.Id);
-            }
-            foreach (var (id, cachedName) in _settings.CachedDeviceNames)
-            {
-                if (!seenNicknameIds.Contains(id))
+                var initialPreset = CurrentProfile == ProfileMode.SimRig
+                    ? (RigPresets.FirstOrDefault(p => p.IsActive) ?? RigPresets.FirstOrDefault())
+                    : (DeskPresets.FirstOrDefault(p => p.IsActive) ?? DeskPresets.FirstOrDefault());
+                if (initialPreset != null)
                 {
-                    string kind = id.Contains('{') ? "Audio (Offline)" : "Display (Offline)";
-                    DeviceNicknames.Add(new DeviceNicknameItemViewModel(id, kind, $"{cachedName} (Offline)", _settings.CustomDeviceNames.GetValueOrDefault(id, string.Empty)));
-                    seenNicknameIds.Add(id);
+                    SelectPresetForNavigation(initialPreset);
                 }
             }
+            else
+            {
+                var matchingPreset = (SelectedPreset.Profile == ProfileMode.SimRig ? RigPresets : DeskPresets)
+                    .FirstOrDefault(p => p.PresetIndex == SelectedPreset.PresetIndex)
+                    ?? DeskPresets.FirstOrDefault();
+                if (matchingPreset != null)
+                {
+                    SelectPresetForNavigation(matchingPreset);
+                }
+            }
+
+            PopulateNicknameCollections(displays, _cachedRawAudioEndpoints);
 
             AudioEndpointsVisibility.Clear();
             var hiddenList = _settings.HiddenAudioEndpointIds;
@@ -392,6 +646,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     isBlacklisted,
                     OnAudioBlacklistChangedAsync));
             }
+            FilteredAudioEndpoints?.Refresh();
             OnPropertyChanged(nameof(FilterStatusSummary));
 
             PopulateMonitorTiles(displays, _settings);
@@ -401,6 +656,139 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             StatusMessage = $"Error loading devices: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void AddNewNickname()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedNewNicknameDeviceId) || string.IsNullOrWhiteSpace(NewNicknameText))
+        {
+            return;
+        }
+
+        string targetId = SelectedNewNicknameDeviceId;
+        string trimmedNick = NewNicknameText.Trim();
+
+        if (_settings != null)
+        {
+            _settings.CustomDeviceNames[targetId] = trimmedNick;
+            _referencedDeviceIds = DeviceOptionResolver.CollectReferencedDeviceIds(_settings);
+        }
+
+        var existingItem = DeviceNicknames.FirstOrDefault(n => string.Equals(n.DeviceId, targetId, StringComparison.OrdinalIgnoreCase));
+        if (existingItem != null)
+        {
+            existingItem.CustomNickname = trimmedNick;
+        }
+        else
+        {
+            var newItem = new DeviceNicknameItemViewModel(targetId, "Device", targetId, trimmedNick, RemoveNickname);
+            DeviceNicknames.Add(newItem);
+        }
+
+        NewNicknameText = string.Empty;
+        RefreshNicknameSelections();
+        StatusMessage = $"Added nickname '{trimmedNick}'. Click Save Changes to persist.";
+    }
+
+    public void RemoveNickname(DeviceNicknameItemViewModel item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        item.CustomNickname = string.Empty;
+        if (_settings != null)
+        {
+            _settings.CustomDeviceNames.Remove(item.DeviceId);
+            _referencedDeviceIds = DeviceOptionResolver.CollectReferencedDeviceIds(_settings);
+        }
+
+        RefreshNicknameSelections();
+        StatusMessage = $"Removed nickname for '{item.HardwareName}'.";
+    }
+
+    private void PopulateNicknameCollections(IReadOnlyList<DisplayDeviceInfo> displays, IReadOnlyList<AudioEndpointInfo> audioEndpoints)
+    {
+        DeviceNicknames.Clear();
+        var seenNicknameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var d in displays)
+        {
+            string nick = _settings?.CustomDeviceNames.GetValueOrDefault(d.MonitorId, string.Empty) ?? string.Empty;
+            DeviceNicknames.Add(new DeviceNicknameItemViewModel(d.MonitorId, "Display", d.FriendlyName, nick, RemoveNickname));
+            seenNicknameIds.Add(d.MonitorId);
+        }
+
+        foreach (var a in audioEndpoints)
+        {
+            bool isRelevant = a.State != DevicePresenceState.NotPresent ||
+                              _referencedDeviceIds.Any(r => DeviceOptionResolver.MatchesEndpoint(r, a.Id)) ||
+                              (_settings?.CustomDeviceNames.ContainsKey(a.Id) == true);
+            if (!isRelevant)
+            {
+                continue;
+            }
+
+            string kind = a.Flow == AudioDeviceFlow.Capture ? "Microphone / Input" : "Audio Playback";
+            string nick = _settings?.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty) ?? string.Empty;
+            DeviceNicknames.Add(new DeviceNicknameItemViewModel(a.Id, kind, a.Name, nick, RemoveNickname));
+            seenNicknameIds.Add(a.Id);
+        }
+
+        if (_settings != null)
+        {
+            foreach (var (id, customNick) in _settings.CustomDeviceNames)
+            {
+                if (!seenNicknameIds.Contains(id) && !string.IsNullOrWhiteSpace(customNick))
+                {
+                    string cachedName = _settings.CachedDeviceNames.GetValueOrDefault(id, id);
+                    string kind = id.Contains('{') ? "Audio (Offline)" : "Display (Offline)";
+                    DeviceNicknames.Add(new DeviceNicknameItemViewModel(id, kind, $"{cachedName} (Offline)", customNick, RemoveNickname));
+                    seenNicknameIds.Add(id);
+                }
+            }
+        }
+
+        RefreshNicknameSelections();
+    }
+
+    private void RefreshNicknameSelections()
+    {
+        ConfiguredNicknames.Clear();
+        UnnicknamedDeviceOptions.Clear();
+
+        foreach (var item in DeviceNicknames)
+        {
+            if (!string.IsNullOrWhiteSpace(item.CustomNickname))
+            {
+                ConfiguredNicknames.Add(item);
+            }
+            else
+            {
+                UnnicknamedDeviceOptions.Add(new DeviceSelectionOption(item.DeviceId, $"[{item.DeviceType}] {item.HardwareName}"));
+            }
+        }
+
+        SelectedNewNicknameDeviceId = UnnicknamedDeviceOptions.FirstOrDefault()?.Id ?? string.Empty;
+    }
+
+    public async Task ActivatePresetNowAsync(ProfileMode profile, int presetIndex)
+    {
+        await SaveSettingsAsync();
+        IsBusy = true;
+        StatusMessage = $"Activating {profile} Preset {presetIndex + 1}...";
+        try
+        {
+            bool ok = await _coordinator.SwitchToPresetAsync(profile, presetIndex);
+            StatusMessage = ok
+                ? $"Activated {profile} Preset {presetIndex + 1}."
+                : $"Failed to activate {profile} Preset {presetIndex + 1}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Activation error: {ex.Message}";
         }
         finally
         {
@@ -474,6 +862,8 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                 else
                     settings.CustomDeviceNames.Remove(nickItem.DeviceId);
             }
+
+            _referencedDeviceIds = DeviceOptionResolver.CollectReferencedDeviceIds(settings);
 
             await _settingsStorage.SaveSettingsAsync(settings);
             _settings = settings;
@@ -689,6 +1079,22 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     private void OnProfileChanged(object? sender, ProfileChangedEventArgs e)
     {
         Application.Current?.Dispatcher?.Invoke(() => CurrentProfile = _coordinator.CurrentProfile);
+    }
+
+    private static string ResolveAppVersionText()
+    {
+        var infoVer = typeof(MainSettingsViewModel).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(infoVer))
+        {
+            int plusIdx = infoVer.IndexOf('+');
+            string clean = plusIdx > 0 ? infoVer[..plusIdx] : infoVer;
+            return clean.StartsWith('v') ? clean : $"v{clean}";
+        }
+
+        var ver = typeof(MainSettingsViewModel).Assembly.GetName().Version;
+        return ver != null ? $"v{ver.Major}.{ver.Minor}.{Math.Max(0, ver.Build)}" : "v1.5.0";
     }
 
     public void Dispose()
