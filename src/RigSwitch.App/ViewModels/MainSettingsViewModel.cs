@@ -1094,7 +1094,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
         }
 
         var ver = typeof(MainSettingsViewModel).Assembly.GetName().Version;
-        return ver != null ? $"v{ver.Major}.{ver.Minor}.{Math.Max(0, ver.Build)}" : "v1.4.0";
+        return ver != null ? $"v{ver.Major}.{ver.Minor}.{Math.Max(0, ver.Build)}" : "v1.5.0";
     }
 
     public void Dispose()
