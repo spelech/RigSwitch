@@ -49,6 +49,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
     private IReadOnlyList<AudioEndpointInfo> _latestAudioEndpoints = [];
     private IDictionary<string, string> _customNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private IDictionary<string, string> _cachedNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private IDictionary<string, string> _cachedResolutions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<string> _blacklistedIds = [];
 
     /// <summary>
@@ -454,13 +455,15 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         IReadOnlyList<AudioEndpointInfo> audioEndpoints,
         IDictionary<string, string> customNames,
         IDictionary<string, string> cachedNames,
-        IReadOnlyList<string> blacklistedIds)
+        IReadOnlyList<string> blacklistedIds,
+        IDictionary<string, string>? cachedResolutions = null)
     {
         _latestDisplays = displays ?? [];
         _latestAudioEndpoints = audioEndpoints ?? [];
         _customNames = customNames ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _cachedNames = cachedNames ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _blacklistedIds = blacklistedIds ?? [];
+        _cachedResolutions = cachedResolutions ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         RebuildMonitorStageAndTray();
         RebuildRankedCollections();
@@ -802,8 +805,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
             var matchedDisplay = _latestDisplays.FirstOrDefault(d => string.Equals(d.MonitorId, monId, StringComparison.OrdinalIgnoreCase));
             var existingPlacement = _monitorPlacements.FirstOrDefault(p => string.Equals(p.MonitorId, monId, StringComparison.OrdinalIgnoreCase));
 
-            int width = existingPlacement?.Width ?? matchedDisplay?.Width ?? 1920;
-            int height = existingPlacement?.Height ?? matchedDisplay?.Height ?? 1080;
+            var (width, height) = ResolveMonitorResolution(monId, matchedDisplay, existingPlacement);
             bool isPrimary = existingPlacement?.IsPrimary ?? (StageMonitors.Count == 0);
             int posX = existingPlacement?.PositionX ?? (isPrimary ? 0 : autoX);
             int posY = existingPlacement?.PositionY ?? 0;
@@ -840,6 +842,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
                 continue;
             }
 
+            var (width, height) = ResolveMonitorResolution(d.MonitorId, d, null);
             string friendly = ResolveDisplayName(d.MonitorId, d.FriendlyName);
             var vm = new PresetMonitorCanvasItemViewModel(
                 displayNumber: displayNum++,
@@ -847,8 +850,8 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
                 friendlyName: friendly,
                 positionX: d.PositionX,
                 positionY: d.PositionY,
-                width: d.Width,
-                height: d.Height,
+                width: width,
+                height: height,
                 isPrimary: false,
                 hdrMode: HdrMode,
                 isOnStage: false,
@@ -1021,22 +1024,36 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
 
         AddableAudioOptions.Clear();
         var allowedAudio = DeviceOptionResolver.FilterBlacklistedEndpoints(_latestAudioEndpoints, _blacklistedIds);
-        foreach (var ep in allowedAudio.Where(e => e.Flow == AudioDeviceFlow.Playback && e.State != DevicePresenceState.NotPresent))
+        var unassignedAudio = allowedAudio
+            .Where(e => e.Flow == AudioDeviceFlow.Playback && !_audioPriorityIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, e.Id)))
+            .OrderBy(e => e.State == DevicePresenceState.Active ? 0 : 1)
+            .ThenBy(e => ResolveAudioDisplayName(e.Id, e.Name));
+
+        foreach (var ep in unassignedAudio)
         {
-            if (!_audioPriorityIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, ep.Id)))
+            string label = ResolveAudioDisplayName(ep.Id, ep.Name);
+            if (ep.State == DevicePresenceState.NotPresent || ep.State == DevicePresenceState.Unplugged)
             {
-                AddableAudioOptions.Add(new DeviceSelectionOption(ep.Id, ResolveAudioDisplayName(ep.Id, ep.Name)));
+                label += " (Disconnected)";
             }
+            AddableAudioOptions.Add(new DeviceSelectionOption(ep.Id, label));
         }
         SelectedAudioToAddId = AddableAudioOptions.FirstOrDefault()?.Id ?? string.Empty;
 
         AddableMicrophoneOptions.Clear();
-        foreach (var ep in allowedAudio.Where(e => e.Flow == AudioDeviceFlow.Capture && e.State != DevicePresenceState.NotPresent))
+        var unassignedMics = allowedAudio
+            .Where(e => e.Flow == AudioDeviceFlow.Capture && !_microphonePriorityIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, e.Id)))
+            .OrderBy(e => e.State == DevicePresenceState.Active ? 0 : 1)
+            .ThenBy(e => ResolveAudioDisplayName(e.Id, e.Name));
+
+        foreach (var ep in unassignedMics)
         {
-            if (!_microphonePriorityIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, ep.Id)))
+            string label = ResolveAudioDisplayName(ep.Id, ep.Name);
+            if (ep.State == DevicePresenceState.NotPresent || ep.State == DevicePresenceState.Unplugged)
             {
-                AddableMicrophoneOptions.Add(new DeviceSelectionOption(ep.Id, ResolveAudioDisplayName(ep.Id, ep.Name)));
+                label += " (Disconnected)";
             }
+            AddableMicrophoneOptions.Add(new DeviceSelectionOption(ep.Id, label));
         }
         SelectedMicToAddId = AddableMicrophoneOptions.FirstOrDefault()?.Id ?? string.Empty;
     }
@@ -1111,6 +1128,51 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         }
 
         return !string.IsNullOrWhiteSpace(baseName) ? baseName : endpointId;
+    }
+
+    private (int Width, int Height) ResolveMonitorResolution(
+        string monId,
+        DisplayDeviceInfo? matchedDisplay,
+        MonitorPlacement? existingPlacement)
+    {
+        // 1. If matchedDisplay has a non-generic resolution (i.e. not 1920x1080), prefer it:
+        if (matchedDisplay != null && matchedDisplay.Width > 0 && matchedDisplay.Height > 0 &&
+            !(matchedDisplay.Width == 1920 && matchedDisplay.Height == 1080))
+        {
+            return (matchedDisplay.Width, matchedDisplay.Height);
+        }
+
+        // 2. If existing placement has a non-generic resolution, keep it:
+        if (existingPlacement != null && existingPlacement.Width > 0 && existingPlacement.Height > 0 &&
+            !(existingPlacement.Width == 1920 && existingPlacement.Height == 1080))
+        {
+            return (existingPlacement.Width, existingPlacement.Height);
+        }
+
+        // 3. Check cached resolutions dictionary if available:
+        if (_cachedResolutions != null && _cachedResolutions.TryGetValue(monId, out var cachedStr))
+        {
+            var parts = cachedStr.Split('x');
+            if (parts.Length == 2 && int.TryParse(parts[0], out int cw) && int.TryParse(parts[1], out int ch) && cw > 0 && ch > 0)
+            {
+                return (cw, ch);
+            }
+        }
+
+        // 4. If matchedDisplay is available, use its resolution (even if 1920x1080):
+        if (matchedDisplay != null && matchedDisplay.Width > 0 && matchedDisplay.Height > 0)
+        {
+            return (matchedDisplay.Width, matchedDisplay.Height);
+        }
+
+        // 5. Existing placement:
+        if (existingPlacement != null && existingPlacement.Width > 0 && existingPlacement.Height > 0)
+        {
+            return (existingPlacement.Width, existingPlacement.Height);
+        }
+
+        // 6. Generic fallback:
+        return (1920, 1080);
     }
 
     private void RemoveApplicationHook(ApplicationHookItemViewModel hook)

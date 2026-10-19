@@ -1,5 +1,6 @@
 namespace RigSwitch.Infrastructure.Windows.CoreAudio;
 
+using RigSwitch.Core.Enums;
 using RigSwitch.Core.Models;
 
 /// <summary>
@@ -52,4 +53,9 @@ public interface INativeAudioProvider
     /// Occurs when the default audio endpoint changes for a given data flow and role.
     /// </summary>
     event Action<EDataFlow, ERole, string>? DefaultDeviceChanged;
+
+    /// <summary>
+    /// Occurs when an audio endpoint device presence state changes.
+    /// </summary>
+    event Action<string, DevicePresenceState>? DeviceStateChanged;
 }

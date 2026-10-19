@@ -22,6 +22,9 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
     /// <inheritdoc/>
     public event Action<EDataFlow, ERole, string>? DefaultDeviceChanged;
 
+    /// <inheritdoc/>
+    public event Action<string, DevicePresenceState>? DeviceStateChanged;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowsNativeAudioProvider"/> class using live Windows COM activations.
     /// </summary>
@@ -487,6 +490,7 @@ public sealed partial class WindowsNativeAudioProvider : INativeAudioProvider, I
     /// <inheritdoc/>
     public int OnDeviceStateChanged(string pwstrDeviceId, DevicePresenceState dwNewState)
     {
+        DeviceStateChanged?.Invoke(pwstrDeviceId, dwNewState);
         return 0;
     }
 

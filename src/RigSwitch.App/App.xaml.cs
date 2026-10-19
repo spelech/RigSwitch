@@ -82,12 +82,17 @@ public partial class App : Application
             builder.Services.AddSingleton<IApplicationLifecycleHookService>(_ => new WindowsApplicationLifecycleHookService());
             builder.Services.AddSingleton<IUpdateCheckService>(_ => new UpdateCheckService());
             builder.Services.AddSingleton<IProfileSwitchCoordinator>(sp =>
-                new ProfileSwitchCoordinator(
+            {
+                var watchdog = sp.GetRequiredService<IAudioEndpointWatchdogService>();
+                return new ProfileSwitchCoordinator(
                     sp.GetRequiredService<IDisplayConfigurationService>(),
                     sp.GetRequiredService<IAudioEndpointDirector>(),
                     sp.GetRequiredService<ISettingsStorageService>(),
                     appHookService: sp.GetRequiredService<IApplicationLifecycleHookService>(),
-                    onIntentionalAudioSwitch: sp.GetRequiredService<IAudioEndpointWatchdogService>().NotifyIntentionalSwitch));
+                    onIntentionalAudioSwitch: watchdog.NotifyIntentionalSwitch,
+                    onProfileSwitchStarting: watchdog.BeginProfileSwitch,
+                    onProfileSwitchCompleted: watchdog.EndProfileSwitch);
+            });
 
             builder.Services.AddSingleton<TrayIconService>();
             builder.Services.AddSingleton<MainSettingsViewModel>();

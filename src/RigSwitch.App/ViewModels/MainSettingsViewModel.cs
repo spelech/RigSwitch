@@ -577,7 +577,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     profile: ProfileMode.Desk,
                     onActivateNow: p => _ = ActivatePresetNowAsync(ProfileMode.Desk, p.PresetIndex),
                     onIdentifyMonitors: IdentifyMonitors);
-                presetVm.HydrateHardwareContext(displays, _cachedRawAudioEndpoints, _settings.CustomDeviceNames, _settings.CachedDeviceNames, _settings.BlacklistedAudioEndpointIds);
+                presetVm.HydrateHardwareContext(displays, _cachedRawAudioEndpoints, _settings.CustomDeviceNames, _settings.CachedDeviceNames, _settings.BlacklistedAudioEndpointIds, _settings.CachedDisplayResolutions);
                 DeskPresets.Add(presetVm);
             }
 
@@ -602,7 +602,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
                     profile: ProfileMode.SimRig,
                     onActivateNow: p => _ = ActivatePresetNowAsync(ProfileMode.SimRig, p.PresetIndex),
                     onIdentifyMonitors: IdentifyMonitors);
-                presetVm.HydrateHardwareContext(displays, _cachedRawAudioEndpoints, _settings.CustomDeviceNames, _settings.CachedDeviceNames, _settings.BlacklistedAudioEndpointIds);
+                presetVm.HydrateHardwareContext(displays, _cachedRawAudioEndpoints, _settings.CustomDeviceNames, _settings.CachedDeviceNames, _settings.BlacklistedAudioEndpointIds, _settings.CachedDisplayResolutions);
                 RigPresets.Add(presetVm);
             }
 
@@ -996,19 +996,37 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
 
         AvailableAudioOptions.Clear();
         AvailableAudioOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Audio Device (Unassigned) —"));
-        foreach (var a in nonBlacklisted.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Playback))
+        var sortedPlayback = nonBlacklisted
+            .Where(x => x.Flow == AudioDeviceFlow.Playback)
+            .OrderBy(x => x.State == DevicePresenceState.Active ? 0 : 1)
+            .ThenBy(x => x.Name);
+
+        foreach (var a in sortedPlayback)
         {
             string customNick = _settings?.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty) ?? string.Empty;
             var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+            if (a.State == DevicePresenceState.NotPresent || a.State == DevicePresenceState.Unplugged)
+            {
+                name += " (Disconnected)";
+            }
             AvailableAudioOptions.Add(new DeviceSelectionOption(a.Id, name));
         }
 
         AvailableMicrophoneOptions.Clear();
         AvailableMicrophoneOptions.Add(new DeviceSelectionOption(string.Empty, "— Select Microphone (Unassigned / System Default) —"));
-        foreach (var a in nonBlacklisted.Where(x => x.State == DevicePresenceState.Active && x.Flow == AudioDeviceFlow.Capture))
+        var sortedCapture = nonBlacklisted
+            .Where(x => x.Flow == AudioDeviceFlow.Capture)
+            .OrderBy(x => x.State == DevicePresenceState.Active ? 0 : 1)
+            .ThenBy(x => x.Name);
+
+        foreach (var a in sortedCapture)
         {
             string customNick = _settings?.CustomDeviceNames.GetValueOrDefault(a.Id, string.Empty) ?? string.Empty;
             var name = !string.IsNullOrWhiteSpace(customNick) ? $"{customNick} ({a.Name})" : a.Name;
+            if (a.State == DevicePresenceState.NotPresent || a.State == DevicePresenceState.Unplugged)
+            {
+                name += " (Disconnected)";
+            }
             AvailableMicrophoneOptions.Add(new DeviceSelectionOption(a.Id, name));
         }
     }
