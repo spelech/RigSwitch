@@ -1,5 +1,6 @@
 # 🚀 RigSwitch
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue?logo=github)](https://spelech.github.io/RigSwitch/)
 [![Release](https://img.shields.io/github/v/release/spelech/RigSwitch?color=00C853&label=release)](https://github.com/spelech/RigSwitch/releases/latest)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
 [![Tests](https://img.shields.io/badge/tests-242%2F242%20passing-brightgreen.svg)](https://github.com/spelech/RigSwitch/actions)
