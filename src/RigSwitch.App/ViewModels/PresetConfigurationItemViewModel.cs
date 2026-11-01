@@ -1023,7 +1023,7 @@ public sealed class PresetConfigurationItemViewModel : ViewModelBase
         }
 
         AddableAudioOptions.Clear();
-        var allowedAudio = DeviceOptionResolver.FilterBlacklistedEndpoints(_latestAudioEndpoints, _blacklistedIds);
+        var allowedAudio = DeviceOptionResolver.FilterBlacklistedEndpoints(_latestAudioEndpoints, _blacklistedIds, _cachedNames);
         var unassignedAudio = allowedAudio
             .Where(e => e.Flow == AudioDeviceFlow.Playback && !_audioPriorityIds.Any(id => DeviceOptionResolver.MatchesEndpoint(id, e.Id)))
             .OrderBy(e => e.State == DevicePresenceState.Active ? 0 : 1)

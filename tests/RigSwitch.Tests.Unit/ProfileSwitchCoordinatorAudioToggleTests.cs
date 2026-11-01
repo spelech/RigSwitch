@@ -428,5 +428,79 @@ public sealed class ProfileSwitchCoordinatorAudioToggleTests
         Assert.True(startingCalled);
         Assert.True(completedCalled);
     }
+
+    [Fact]
+    public async Task SwitchProfile_FiltersOutBlacklistedAudioEndpoints_ByFriendlyName()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{OLD-SHAKER-GUID}"],
+            CachedDeviceNames = new Dictionary<string, string>
+            {
+                ["{OLD-SHAKER-GUID}"] = "Pedals - Nobsound (USB2.0 Device)"
+            },
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{OFFLINE-ID}",
+                    FallbackAudioId = string.Empty,
+                    TargetMonitorIds = ["MONITOR-1"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("MONITOR-1", @"\\.\DISPLAY1", "OLED", "GPU", true, true)]);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{NEW-SHAKER-GUID}", "Pedals - Nobsound (USB2.0 Device)", "USB", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback),
+            new("{SPEAKERS}", "Pebble V3", "Realtek", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>()).Returns(endpoints);
+
+        var coordinator = new ProfileSwitchCoordinator(_displayManager, _audioDirector, _storageService);
+        await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        // Crucial: Must match friendly name and NOT route to {NEW-SHAKER-GUID}
+        await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync("{SPEAKERS}", Arg.Any<CancellationToken>());
+        await _audioDirector.DidNotReceive().SetDefaultPlaybackEndpointAsync("{NEW-SHAKER-GUID}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchProfile_WhenRankedEndpointsOffline_DoesNotPickActiveShaker()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{SHAKER-FOXI}"],
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    AudioPriorityIds = ["{MONITOR-AUDIO}"],
+                    TargetMonitorIds = ["MONITOR-1"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("MONITOR-1", @"\\.\DISPLAY1", "OLED", "GPU", true, true)]);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{MONITOR-AUDIO}", "MSI MPG341CX OLED", "NVIDIA", DevicePresenceState.NotPresent, false, false, AudioDeviceFlow.Playback),
+            new("{SHAKER-FOXI}", "Chassis - Fosi BST-1 (USB Audio Adapter)", "USB", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>()).Returns(endpoints);
+
+        var coordinator = new ProfileSwitchCoordinator(_displayManager, _audioDirector, _storageService);
+        await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        // Must NOT route to shaker
+        await _audioDirector.DidNotReceive().SetDefaultPlaybackEndpointAsync("{SHAKER-FOXI}", Arg.Any<CancellationToken>());
+    }
 }
 

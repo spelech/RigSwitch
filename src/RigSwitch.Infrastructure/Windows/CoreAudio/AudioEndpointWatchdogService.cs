@@ -275,7 +275,7 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
                 }
             }
 
-            bool isBlacklisted = blacklisted?.Any(b => MatchesEndpoint(b, effectiveEndpointId)) == true;
+            bool isBlacklisted = MatchesBlacklist(effectiveEndpointId, blacklisted, renderEndpoints, settings.CachedDeviceNames);
             if (isBlacklisted)
             {
                 string? targetId = null;
@@ -291,13 +291,6 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
                 {
                     var activePreset = settings.GetActivePreset(settings.LastActiveProfile);
                     targetId = ResolveEffectiveTargetEndpoint(activePreset, settings.ActiveAudioOutputMode, blacklisted, renderEndpoints, settings.CachedDeviceNames);
-                }
-
-                if (string.IsNullOrWhiteSpace(targetId) && renderEndpoints is { Count: > 0 })
-                {
-                    targetId = renderEndpoints
-                        .FirstOrDefault(e => e.State == DevicePresenceState.Active && blacklisted?.Any(b => MatchesEndpoint(b, e.Id)) != true)
-                        ?.Id;
                 }
 
                 if (!string.IsNullOrWhiteSpace(targetId))
@@ -379,7 +372,7 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
                 if (renderEndpoints is { Count: > 0 })
                 {
                     var match = renderEndpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active &&
-                        !blacklisted?.Any(b => MatchesEndpoint(b, e.Id)) == true &&
+                        !MatchesBlacklist(e.Id, blacklisted, renderEndpoints, cachedNames) &&
                         (MatchesEndpoint(candidateId, e.Id) || MatchesFriendlyName(candidateId, e.Name, cachedNames)));
                     if (match != null)
                     {
@@ -402,7 +395,7 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
         if (renderEndpoints is { Count: > 0 })
         {
             var matchPreferred = renderEndpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active &&
-                !blacklisted?.Any(b => MatchesEndpoint(b, e.Id)) == true &&
+                !MatchesBlacklist(e.Id, blacklisted, renderEndpoints, cachedNames) &&
                 (MatchesEndpoint(preferredId, e.Id) || MatchesFriendlyName(preferredId, e.Name, cachedNames)));
             if (matchPreferred != null)
             {
@@ -410,7 +403,7 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
             }
 
             var matchFallback = renderEndpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active &&
-                !blacklisted?.Any(b => MatchesEndpoint(b, e.Id)) == true &&
+                !MatchesBlacklist(e.Id, blacklisted, renderEndpoints, cachedNames) &&
                 (MatchesEndpoint(activePreset.FallbackAudioId, e.Id) || MatchesFriendlyName(activePreset.FallbackAudioId, e.Name, cachedNames)));
             if (matchFallback != null)
             {
@@ -433,6 +426,49 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
         return null;
     }
 
+    private static bool MatchesBlacklist(
+        string? endpointId,
+        IReadOnlyList<string>? blacklisted,
+        IReadOnlyList<AudioEndpointInfo>? renderEndpoints,
+        IDictionary<string, string>? cachedNames)
+    {
+        if (string.IsNullOrWhiteSpace(endpointId) || blacklisted == null || blacklisted.Count == 0)
+        {
+            return false;
+        }
+
+        var endpoint = renderEndpoints?.FirstOrDefault(e => MatchesEndpoint(e.Id, endpointId));
+        string? endpointName = endpoint?.Name;
+
+        foreach (var b in blacklisted)
+        {
+            if (string.IsNullOrWhiteSpace(b))
+            {
+                continue;
+            }
+
+            if (MatchesEndpoint(b, endpointId))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(endpointName) && MatchesFriendlyName(b, endpointName, cachedNames))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(endpointName) && cachedNames != null &&
+                cachedNames.TryGetValue(b, out var cachedBlacklistName) &&
+                !string.IsNullOrWhiteSpace(cachedBlacklistName) &&
+                string.Equals(cachedBlacklistName, endpointName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool IsEndpointAvailable(
         string? candidateId,
         IReadOnlyList<string>? blacklisted,
@@ -444,7 +480,7 @@ public sealed partial class AudioEndpointWatchdogService : IAudioEndpointWatchdo
             return false;
         }
 
-        if (blacklisted?.Any(b => MatchesEndpoint(b, candidateId)) == true)
+        if (MatchesBlacklist(candidateId, blacklisted, renderEndpoints, cachedNames))
         {
             return false;
         }

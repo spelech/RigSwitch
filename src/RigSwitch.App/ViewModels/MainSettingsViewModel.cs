@@ -41,7 +41,7 @@ public sealed partial class MainSettingsViewModel : ViewModelBase, IDisposable
     private string _deskHotkey = "Ctrl+Alt+D";
     private string _rigHotkey = "Ctrl+Alt+R";
     private string _audioToggleHotkey = "Ctrl+Alt+A";
-    private bool _enforcePrimaryAudio = true;
+    private bool _enforcePrimaryAudio;
     private bool _startMinimizedToTray = true;
     private bool _showToastNotifications = true;
     private bool _enableAutoUpdateCheck = true;

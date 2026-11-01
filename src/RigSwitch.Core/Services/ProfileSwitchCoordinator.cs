@@ -120,7 +120,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
             var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
             var blacklisted = settings.BlacklistedAudioEndpointIds ?? [];
-            var allowedEndpoints = endpointList.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList();
+            var allowedEndpoints = endpointList.Where(e => !MatchesBlacklist(e, blacklisted, settings.CachedDeviceNames)).ToList();
             var playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
             var captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
@@ -281,7 +281,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
             var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
             var blacklisted = settings.BlacklistedAudioEndpointIds ?? [];
-            var allowedEndpoints = endpointList.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList();
+            var allowedEndpoints = endpointList.Where(e => !MatchesBlacklist(e, blacklisted, settings.CachedDeviceNames)).ToList();
             var playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
             var captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
@@ -299,7 +299,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                     await Task.Delay(250, cancellationToken).ConfigureAwait(false);
                     endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
                     endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
-                    allowedEndpoints = endpointList.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList();
+                    allowedEndpoints = endpointList.Where(e => !MatchesBlacklist(e, blacklisted, settings.CachedDeviceNames)).ToList();
                     playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
                     captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
@@ -483,6 +483,44 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         }
     }
 
+    private static bool MatchesBlacklist(
+        AudioEndpointInfo endpoint,
+        IReadOnlyList<string>? blacklisted,
+        IDictionary<string, string>? cachedNames)
+    {
+        if (blacklisted == null || blacklisted.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var b in blacklisted)
+        {
+            if (string.IsNullOrWhiteSpace(b))
+            {
+                continue;
+            }
+
+            if (MatchesEndpoint(b, endpoint.Id))
+            {
+                return true;
+            }
+
+            if (MatchesFriendlyName(b, endpoint.Name, cachedNames))
+            {
+                return true;
+            }
+
+            if (cachedNames != null && cachedNames.TryGetValue(b, out var cachedBlacklistName) &&
+                !string.IsNullOrWhiteSpace(cachedBlacklistName) &&
+                string.Equals(cachedBlacklistName, endpoint.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static string? ResolveRankedAudioEndpoint(
         IReadOnlyList<string> rankedIds,
         IList<AudioEndpointInfo> allowedEndpoints,
@@ -503,15 +541,15 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
 
             var activeMatch = allowedEndpoints.FirstOrDefault(e =>
                 (MatchesEndpoint(e.Id, candidateId) || MatchesFriendlyName(candidateId, e.Name, cachedNames)) &&
-                e.State == DevicePresenceState.Active);
+                e.State == DevicePresenceState.Active &&
+                !MatchesBlacklist(e, blacklisted, cachedNames));
             if (activeMatch != null)
             {
                 return activeMatch.Id;
             }
         }
 
-        var firstActive = allowedEndpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active);
-        return firstActive?.Id;
+        return null;
     }
 
     private static string? ResolveNextCycledRankedEndpoint(
@@ -577,9 +615,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         var effectiveFallback = isFallbackBlacklisted ? null : fallbackAudioId;
 
         var candidates = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
-        var allowedCandidates = blacklisted != null
-            ? candidates.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList()
-            : candidates;
+        var allowedCandidates = candidates.Where(e => !MatchesBlacklist(e, blacklisted, cachedNames)).ToList();
 
         var primaryMatch = allowedCandidates.FirstOrDefault(e =>
             (MatchesEndpoint(e.Id, effectivePrimary) || MatchesFriendlyName(effectivePrimary, e.Name, cachedNames)) &&

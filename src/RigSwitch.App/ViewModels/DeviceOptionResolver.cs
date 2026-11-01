@@ -43,7 +43,8 @@ internal static partial class DeviceOptionResolver
     /// <returns>A list of audio endpoints that are not blacklisted.</returns>
     public static IReadOnlyList<AudioEndpointInfo> FilterBlacklistedEndpoints(
         IEnumerable<AudioEndpointInfo>? endpoints,
-        IEnumerable<string>? blacklistedIds)
+        IEnumerable<string>? blacklistedIds,
+        IDictionary<string, string>? cachedNames = null)
     {
         if (endpoints == null)
         {
@@ -60,7 +61,11 @@ internal static partial class DeviceOptionResolver
         }
 
         return endpoints
-            .Where(ep => !blacklist.Any(bId => MatchesEndpoint(bId, ep.Id)))
+            .Where(ep => !blacklist.Any(bId =>
+                MatchesEndpoint(bId, ep.Id) ||
+                (cachedNames != null && cachedNames.TryGetValue(bId, out var cachedName) &&
+                 !string.IsNullOrWhiteSpace(cachedName) &&
+                 string.Equals(cachedName, ep.Name, StringComparison.OrdinalIgnoreCase))))
             .ToList();
     }
 
