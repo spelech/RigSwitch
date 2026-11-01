@@ -21,13 +21,21 @@ public sealed record DisplayDeviceInfo
     /// <param name="displayAdapter">The graphics adapter name driving this display.</param>
     /// <param name="isActive">Whether the display is currently active in the Windows display topology.</param>
     /// <param name="isPrimary">Whether the display is currently designated as the primary display.</param>
+    /// <param name="supportsHdr">Whether the display hardware and driver support HDR / Advanced Color.</param>
+    /// <param name="isHdrEnabled">Whether HDR / Advanced Color is currently enabled on the display.</param>
     public DisplayDeviceInfo(
         string monitorId,
         string devicePath,
         string friendlyName,
         string displayAdapter,
         bool isActive,
-        bool isPrimary)
+        bool isPrimary,
+        bool supportsHdr = false,
+        bool isHdrEnabled = false,
+        int positionX = 0,
+        int positionY = 0,
+        int width = 1920,
+        int height = 1080)
     {
         MonitorId = monitorId;
         DevicePath = devicePath;
@@ -35,6 +43,12 @@ public sealed record DisplayDeviceInfo
         DisplayAdapter = displayAdapter;
         IsActive = isActive;
         IsPrimary = isPrimary;
+        SupportsHdr = supportsHdr;
+        IsHdrEnabled = isHdrEnabled;
+        PositionX = positionX;
+        PositionY = positionY;
+        Width = width > 0 ? width : 1920;
+        Height = height > 0 ? height : 1080;
     }
 
     /// <summary>
@@ -66,6 +80,36 @@ public sealed record DisplayDeviceInfo
     /// Gets a value indicating whether this display is currently the primary display.
     /// </summary>
     public bool IsPrimary { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether this display supports HDR / Advanced Color.
+    /// </summary>
+    public bool SupportsHdr { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether HDR / Advanced Color is currently enabled on this display.
+    /// </summary>
+    public bool IsHdrEnabled { get; init; }
+
+    /// <summary>
+    /// Gets the horizontal desktop position coordinate in pixels.
+    /// </summary>
+    public int PositionX { get; init; }
+
+    /// <summary>
+    /// Gets the vertical desktop position coordinate in pixels.
+    /// </summary>
+    public int PositionY { get; init; }
+
+    /// <summary>
+    /// Gets the display horizontal resolution width in pixels.
+    /// </summary>
+    public int Width { get; init; } = 1920;
+
+    /// <summary>
+    /// Gets the display vertical resolution height in pixels.
+    /// </summary>
+    public int Height { get; init; } = 1080;
 
     /// <summary>
     /// Checks whether this display device matches the specified monitor identifier, device path, or friendly name.

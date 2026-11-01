@@ -2,6 +2,7 @@ namespace RigSwitch.App.ViewModels;
 
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
+using RigSwitch.Core.Enums;
 using RigSwitch.Core.Models;
 
 /// <summary>
@@ -16,20 +17,10 @@ internal static partial class DeviceOptionResolver
     /// Determines whether two audio endpoint identifiers refer to the same physical device,
     /// comparing either direct strings or extracted GUID components.
     /// </summary>
-    /// <param name="idA">The first device identifier.</param>
-    /// <param name="idB">The second device identifier.</param>
-    /// <returns><c>true</c> if the identifiers match; otherwise, <c>false</c>.</returns>
     public static bool MatchesEndpoint(string? idA, string? idB)
     {
-        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB))
-        {
-            return false;
-        }
-
-        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
+        if (string.IsNullOrWhiteSpace(idA) || string.IsNullOrWhiteSpace(idB)) return false;
+        if (string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase)) return true;
 
         var matchA = GuidPattern().Match(idA);
         var matchB = GuidPattern().Match(idB);
@@ -45,46 +36,250 @@ internal static partial class DeviceOptionResolver
     }
 
     /// <summary>
+    /// Filters out audio endpoints whose identifiers match any of the blacklisted identifiers.
+    /// </summary>
+    /// <param name="endpoints">The collection of audio endpoints to filter.</param>
+    /// <param name="blacklistedIds">The collection of blacklisted endpoint identifiers.</param>
+    /// <returns>A list of audio endpoints that are not blacklisted.</returns>
+    public static IReadOnlyList<AudioEndpointInfo> FilterBlacklistedEndpoints(
+        IEnumerable<AudioEndpointInfo>? endpoints,
+        IEnumerable<string>? blacklistedIds,
+        IDictionary<string, string>? cachedNames = null)
+    {
+        if (endpoints == null)
+        {
+            return [];
+        }
+
+        var blacklist = blacklistedIds?
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToList();
+
+        if (blacklist == null || blacklist.Count == 0)
+        {
+            return endpoints.ToList();
+        }
+
+        return endpoints
+            .Where(ep => !blacklist.Any(bId =>
+                MatchesEndpoint(bId, ep.Id) ||
+                (cachedNames != null && cachedNames.TryGetValue(bId, out var cachedName) &&
+                 !string.IsNullOrWhiteSpace(cachedName) &&
+                 string.Equals(cachedName, ep.Name, StringComparison.OrdinalIgnoreCase))))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Filters an audio endpoint item based on search text, presence state filter selection, and optional referenced IDs.
+    /// </summary>
+    public static bool MatchesAudioFilter(
+        AudioEndpointVisibilityItemViewModel item,
+        string searchText,
+        string filterSelection,
+        IEnumerable<string>? referencedIds = null)
+    {
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            bool nameMatch = item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            bool adapterMatch = item.Adapter.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+            if (!nameMatch && !adapterMatch) return false;
+        }
+
+        if (string.Equals(filterSelection, "Relevant", StringComparison.OrdinalIgnoreCase))
+        {
+            if (item.State != DevicePresenceState.NotPresent)
+            {
+                return true;
+            }
+
+            if (item.IsBlacklisted || !item.IsVisible)
+            {
+                return true;
+            }
+
+            return referencedIds != null && referencedIds.Any(rId => MatchesEndpoint(rId, item.Id));
+        }
+
+        if (string.Equals(filterSelection, "Active", StringComparison.OrdinalIgnoreCase))
+            return item.State == DevicePresenceState.Active;
+
+        if (string.Equals(filterSelection, "Disabled", StringComparison.OrdinalIgnoreCase))
+            return item.State == DevicePresenceState.Disabled;
+
+        if (string.Equals(filterSelection, "Unplugged", StringComparison.OrdinalIgnoreCase))
+            return item.State == DevicePresenceState.Unplugged || item.State == DevicePresenceState.NotPresent;
+
+        if (string.Equals(filterSelection, "Inactive", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filterSelection, "Disabled / Unplugged", StringComparison.OrdinalIgnoreCase))
+            return item.State != DevicePresenceState.Active;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Collects all device IDs referenced across presets, blacklists, hidden endpoints, and custom nicknames.
+    /// </summary>
+    public static HashSet<string> CollectReferencedDeviceIds(UserSettings? settings)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (settings == null)
+        {
+            return ids;
+        }
+
+        void AddIfNotEmpty(string? id)
+        {
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                ids.Add(id);
+            }
+        }
+
+        AddIfNotEmpty(settings.DeskMonitorId);
+        AddIfNotEmpty(settings.RigMonitorId);
+        AddIfNotEmpty(settings.DeskPrimaryAudioId);
+        AddIfNotEmpty(settings.DeskFallbackAudioId);
+        AddIfNotEmpty(settings.RigPrimaryAudioId);
+
+        foreach (var b in settings.BlacklistedAudioEndpointIds) AddIfNotEmpty(b);
+        foreach (var h in settings.HiddenAudioEndpointIds) AddIfNotEmpty(h);
+        foreach (var (k, v) in settings.CustomDeviceNames)
+        {
+            if (!string.IsNullOrWhiteSpace(v)) AddIfNotEmpty(k);
+        }
+
+        foreach (var preset in settings.DeskPresets.Concat(settings.RigPresets))
+        {
+            foreach (var m in preset.TargetMonitorIds) AddIfNotEmpty(m);
+            foreach (var p in preset.MonitorPlacements) AddIfNotEmpty(p.MonitorId);
+            foreach (var a in preset.GetEffectiveAudioPriorityList()) AddIfNotEmpty(a);
+            foreach (var mic in preset.GetEffectiveMicrophonePriorityList()) AddIfNotEmpty(mic);
+        }
+
+        return ids;
+    }
+
+    /// <summary>
+    /// Formats an audio endpoint label for an offline or disconnected device.
+    /// </summary>
+    public static string FormatOfflineAudioLabel(
+        string id,
+        string? detectedName,
+        IDictionary<string, string>? customNames,
+        IDictionary<string, string>? cachedNames)
+    {
+        string nick = string.Empty;
+        if (customNames != null && customNames.TryGetValue(id, out var custom) && !string.IsNullOrWhiteSpace(custom))
+        {
+            nick = custom;
+        }
+
+        string baseName = detectedName ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(baseName) && cachedNames != null && cachedNames.TryGetValue(id, out var cached))
+        {
+            baseName = cached;
+        }
+
+        if (!string.IsNullOrWhiteSpace(nick) && !string.IsNullOrWhiteSpace(baseName))
+            return $"{nick} ({baseName}) (Disconnected)";
+        if (!string.IsNullOrWhiteSpace(nick))
+            return $"{nick} (Disconnected)";
+        if (!string.IsNullOrWhiteSpace(baseName))
+            return $"{baseName} (Disconnected)";
+
+        return $"{id} (Disconnected)";
+    }
+
+    /// <summary>
+    /// Formats a display monitor label for an offline or disconnected display.
+    /// </summary>
+    public static string FormatOfflineDisplayLabel(
+        string monitorId,
+        IDictionary<string, string>? customNames,
+        IDictionary<string, string>? cachedNames)
+    {
+        string nick = string.Empty;
+        if (customNames != null && customNames.TryGetValue(monitorId, out var custom) && !string.IsNullOrWhiteSpace(custom))
+        {
+            nick = custom;
+        }
+
+        string baseName = string.Empty;
+        if (cachedNames != null && cachedNames.TryGetValue(monitorId, out var cached) && !string.IsNullOrWhiteSpace(cached))
+        {
+            baseName = cached;
+        }
+
+        if (!string.IsNullOrWhiteSpace(nick) && !string.IsNullOrWhiteSpace(baseName))
+            return $"{nick} ({baseName}) [{monitorId}] (Disconnected)";
+        if (!string.IsNullOrWhiteSpace(nick))
+            return $"{nick} [{monitorId}] (Disconnected)";
+        if (!string.IsNullOrWhiteSpace(baseName))
+            return $"{baseName} [{monitorId}] (Disconnected)";
+
+        return $"{monitorId} (Disconnected)";
+    }
+
+    /// <summary>
     /// Resolves a target audio endpoint ID against detected endpoints, adding an unlisted entry to options if missing.
     /// </summary>
-    /// <param name="targetId">The configured audio endpoint identifier.</param>
-    /// <param name="endpoints">Currently enumerated audio endpoints.</param>
-    /// <param name="options">Selection options collection bound to the view.</param>
-    /// <returns>The matched endpoint ID, or the original ID if disconnected.</returns>
     public static string ResolveAudioOption(
         string targetId,
         IEnumerable<AudioEndpointInfo> endpoints,
-        ObservableCollection<DeviceSelectionOption> options)
+        ObservableCollection<DeviceSelectionOption> options,
+        IDictionary<string, string>? customNames = null,
+        IDictionary<string, string>? cachedNames = null)
     {
-        if (string.IsNullOrWhiteSpace(targetId))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(targetId)) return string.Empty;
 
         var match = endpoints.FirstOrDefault(a => MatchesEndpoint(a.Id, targetId));
         if (match != null)
         {
+            if (!options.Any(opt => opt.Id == match.Id))
+            {
+                var label = FormatOfflineAudioLabel(match.Id, match.Name, customNames, cachedNames);
+                options.Add(new DeviceSelectionOption(match.Id, label));
+            }
             return match.Id;
         }
 
         if (!options.Any(opt => opt.Id == targetId))
         {
-            options.Add(new DeviceSelectionOption(targetId, $"{targetId} (Saved / Disconnected)"));
+            var label = FormatOfflineAudioLabel(targetId, null, customNames, cachedNames);
+            options.Add(new DeviceSelectionOption(targetId, label));
         }
 
         return targetId;
     }
 
     /// <summary>
+    /// Resolves a target audio endpoint ID against detected endpoints, adding an unlisted entry to options if missing.
+    /// </summary>
+    public static string ResolveAudioOption(
+        string targetId,
+        IEnumerable<AudioEndpointInfo> endpoints,
+        ObservableCollection<DeviceSelectionOption> options)
+        => ResolveAudioOption(targetId, endpoints, options, null, null);
+
+    /// <summary>
     /// Ensures that a saved display monitor ID is present in the selectable options collection.
     /// </summary>
-    /// <param name="monitorId">The target monitor hardware identifier.</param>
-    /// <param name="options">Selection options collection bound to the view.</param>
-    public static void EnsureDisplayOption(string monitorId, ObservableCollection<DeviceSelectionOption> options)
+    public static void EnsureDisplayOption(
+        string monitorId,
+        ObservableCollection<DeviceSelectionOption> options,
+        IDictionary<string, string>? customNames = null,
+        IDictionary<string, string>? cachedNames = null)
     {
         if (!string.IsNullOrWhiteSpace(monitorId) && !options.Any(opt => opt.Id == monitorId))
         {
-            options.Add(new DeviceSelectionOption(monitorId, $"{monitorId} (Saved / Disconnected)"));
+            var label = FormatOfflineDisplayLabel(monitorId, customNames, cachedNames);
+            options.Add(new DeviceSelectionOption(monitorId, label));
         }
     }
+
+    /// <summary>
+    /// Ensures that a saved display monitor ID is present in the selectable options collection.
+    /// </summary>
+    public static void EnsureDisplayOption(string monitorId, ObservableCollection<DeviceSelectionOption> options)
+        => EnsureDisplayOption(monitorId, options, null, null);
 }

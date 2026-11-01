@@ -15,11 +15,57 @@ public interface IDisplayConfigurationService
     Task<IReadOnlyList<DisplayDeviceInfo>> EnumerateDisplaysAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Applies a display topology, activating the specified target displays (the first as primary) and disabling inactive displays.
+    /// </summary>
+    /// <param name="targetMonitorIds">The list of hardware/EDID identifiers of monitors to activate.</param>
+    /// <param name="inactiveMonitorIds">The optional list of hardware/EDID identifiers of monitors to disable.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task ApplyDisplayTopologyAsync(IReadOnlyList<string> targetMonitorIds, IReadOnlyList<string>? inactiveMonitorIds = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Applies a display topology with optional explicit 2D monitor coordinate placements.
+    /// </summary>
+    /// <param name="targetMonitorIds">The list of hardware/EDID identifiers of monitors to activate.</param>
+    /// <param name="inactiveMonitorIds">The optional list of hardware/EDID identifiers of monitors to disable.</param>
+    /// <param name="placements">Optional 2D coordinate placements for each target monitor.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task ApplyDisplayTopologyAsync(
+        IReadOnlyList<string> targetMonitorIds,
+        IReadOnlyList<string>? inactiveMonitorIds,
+        IReadOnlyList<MonitorPlacement>? placements,
+        CancellationToken cancellationToken = default) =>
+        ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, cancellationToken);
+
+    /// <summary>
     /// Applies a single-display topology, activating the specified target display as primary and disabling the inactive display.
     /// </summary>
     /// <param name="targetMonitorId">The hardware/EDID identifier of the monitor to activate and make primary.</param>
     /// <param name="inactiveMonitorId">The optional hardware/EDID identifier of the monitor to disable.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task ApplySingleDisplayTopologyAsync(string targetMonitorId, string? inactiveMonitorId, CancellationToken cancellationToken = default);
+    Task ApplySingleDisplayTopologyAsync(string targetMonitorId, string? inactiveMonitorId, CancellationToken cancellationToken = default)
+    {
+        var targets = string.IsNullOrWhiteSpace(targetMonitorId) ? Array.Empty<string>() : new[] { targetMonitorId };
+        var inactives = string.IsNullOrWhiteSpace(inactiveMonitorId) ? null : new[] { inactiveMonitorId };
+        return ApplyDisplayTopologyAsync(targets, inactives, cancellationToken);
+    }
+
+    /// <summary>
+    /// Retrieves native Windows HDR and Advanced Color status for the specified monitor.
+    /// </summary>
+    /// <param name="monitorId">The EDID, hardware ID, or device path of the monitor.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A <see cref="DisplayHdrInfo"/> representing HDR capabilities and active state, or null if the monitor is not found.</returns>
+    Task<DisplayHdrInfo?> GetHdrInfoAsync(string monitorId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the native Windows HDR / Advanced Color state on the specified monitor using Windows CCD APIs.
+    /// </summary>
+    /// <param name="monitorId">The EDID, hardware ID, or device path of the monitor.</param>
+    /// <param name="enableHdr">True to enable HDR / Advanced Color; false to disable HDR.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task SetHdrStateAsync(string monitorId, bool enableHdr, CancellationToken cancellationToken = default);
 }

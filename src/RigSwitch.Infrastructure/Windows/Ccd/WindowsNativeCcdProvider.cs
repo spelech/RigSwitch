@@ -72,4 +72,22 @@ public sealed class WindowsNativeCcdProvider : INativeCcdProvider
             modes,
             flags);
     }
+
+    /// <inheritdoc/>
+    public int GetAdvancedColorInfo(ref DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO advancedColorInfo)
+    {
+        return NativeCcdApi.DisplayConfigGetDeviceInfo(ref advancedColorInfo);
+    }
+
+    /// <inheritdoc/>
+    public int SetAdvancedColorState(ref DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE advancedColorState)
+    {
+        return NativeCcdApi.DisplayConfigSetDeviceInfo(ref advancedColorState);
+    }
+
+    /// <inheritdoc/>
+    public int SetHdrState(ref DISPLAYCONFIG_SET_HDR_STATE hdrState)
+    {
+        return NativeCcdApi.DisplayConfigSetDeviceInfo(ref hdrState);
+    }
 }

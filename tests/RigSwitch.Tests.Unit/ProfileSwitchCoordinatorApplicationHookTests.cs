@@ -78,7 +78,7 @@ public sealed class ProfileSwitchCoordinatorApplicationHookTests
 
         Received.InOrder(() =>
         {
-            _displayService.ApplySingleDisplayTopologyAsync(RigMonitorId, DeskMonitorId, Arg.Any<CancellationToken>());
+            _displayService.ApplyDisplayTopologyAsync(Arg.Is<IReadOnlyList<string>>(l => l.Contains(RigMonitorId)), Arg.Is<IReadOnlyList<string>?>(l => l != null && l.Contains(DeskMonitorId)), Arg.Any<CancellationToken>());
             _appHookService.CloseHooksForPresetAsync(_settings.DeskPresets[0], Arg.Any<CancellationToken>());
             _appHookService.LaunchHooksForPresetAsync(_settings.RigPresets[0], Arg.Any<CancellationToken>());
         });

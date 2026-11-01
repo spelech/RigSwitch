@@ -1,5 +1,6 @@
 namespace RigSwitch.App.Services;
 
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -25,11 +26,34 @@ public sealed class TrayIconService : IDisposable
     private readonly List<ToolStripMenuItem> _rigPresetMenuItems = [];
     private ToolStripMenuItem? _deskMenuItem;
     private ToolStripMenuItem? _rigMenuItem;
+    private ToolStripMenuItem? _audioToggleMenuItem;
+
+    /// <summary>
+    /// Gets the notify icon managed by this service.
+    /// </summary>
+    internal NotifyIcon? NotifyIcon => _notifyIcon;
+
+    /// <summary>
+    /// Gets the audio toggle context menu item.
+    /// </summary>
+    internal ToolStripMenuItem? AudioToggleMenuItem => _audioToggleMenuItem;
 
     /// <summary>
     /// Gets or sets a value indicating whether balloon toast notifications are displayed.
     /// </summary>
     public bool ShowToastNotifications { get; set; } = true;
+
+    /// <summary>
+    /// Formats the context menu display text for the audio toggle item based on current audio mode.
+    /// </summary>
+    /// <param name="mode">The active audio output destination mode.</param>
+    /// <returns>A formatted context menu display label.</returns>
+    internal static string GetAudioToggleMenuText(AudioOutputMode mode)
+    {
+        return mode == AudioOutputMode.Primary
+            ? "🔊 Toggle Audio: Speakers"
+            : "🔊 Toggle Audio: Headset";
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TrayIconService"/> class.
@@ -96,7 +120,25 @@ public sealed class TrayIconService : IDisposable
 
             BuildPresetSubmenus(settings);
 
-            var separator = new ToolStripSeparator();
+            _audioToggleMenuItem = new ToolStripMenuItem(GetAudioToggleMenuText(_coordinator.CurrentAudioOutputMode), null, (s, e) =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var newMode = await _coordinator.ToggleAudioOutputModeAsync().ConfigureAwait(false);
+                        UpdateAudioState(newMode);
+                        ShowNotification("RigSwitch Audio", $"Switched audio output to {(newMode == AudioOutputMode.Primary ? "Speakers" : "Headset")}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        ShowNotification("RigSwitch Audio Error", $"Failed to toggle audio output: {ex.Message}");
+                    }
+                });
+            });
+
+            var audioSeparator = new ToolStripSeparator();
+            var settingsSeparator = new ToolStripSeparator();
 
             var settingsMenuItem = new ToolStripMenuItem("⚙️ Settings...", null, (s, e) =>
             {
@@ -115,7 +157,9 @@ public sealed class TrayIconService : IDisposable
             [
                 _deskMenuItem,
                 _rigMenuItem,
-                separator,
+                audioSeparator,
+                _audioToggleMenuItem,
+                settingsSeparator,
                 settingsMenuItem,
                 exitMenuItem
             ]);
@@ -245,6 +289,37 @@ public sealed class TrayIconService : IDisposable
     }
 
     /// <summary>
+    /// Updates the audio toggle context menu item and tooltip to reflect the active audio output mode.
+    /// Thread-safe — marshals to the tray icon's STA thread.
+    /// </summary>
+    /// <param name="mode">The active audio output destination mode.</param>
+    public void UpdateAudioState(AudioOutputMode mode)
+    {
+        if (_invoker == null || _notifyIcon == null)
+        {
+            return;
+        }
+
+        if (_invoker.InvokeRequired)
+        {
+            _invoker.Invoke(() => ApplyAudioState(mode));
+            return;
+        }
+
+        ApplyAudioState(mode);
+    }
+
+    private void ApplyAudioState(AudioOutputMode mode)
+    {
+        if (_audioToggleMenuItem != null)
+        {
+            _audioToggleMenuItem.Text = GetAudioToggleMenuText(mode);
+        }
+
+        ApplyTooltip(_coordinator.CurrentProfile, _coordinator.CurrentPreset, mode);
+    }
+
+    /// <summary>
     /// Displays a Windows system balloon tip notification if enabled in user settings.
     /// Thread-safe — marshals to the tray icon's STA thread.
     /// </summary>
@@ -301,22 +376,11 @@ public sealed class TrayIconService : IDisposable
         }
 
         var oldIcon = _notifyIcon.Icon;
-        var newIcon = CreateProfileIcon(mode);
+        var newIcon = LoadProfileIcon(mode);
 
         _notifyIcon.Icon = newIcon;
 
-        var activePreset = preset ?? _coordinator.CurrentPreset;
-        var presetName = activePreset?.Name ?? "Default";
-        var tooltip = mode == ProfileMode.Desk
-            ? $"RigSwitch - Desk Setup ({presetName})"
-            : $"RigSwitch - Sim Rig Setup ({presetName})";
-
-        if (tooltip.Length > 63)
-        {
-            tooltip = tooltip[..63];
-        }
-
-        _notifyIcon.Text = tooltip;
+        ApplyTooltip(mode, preset, _coordinator.CurrentAudioOutputMode);
 
         oldIcon?.Dispose();
 
@@ -328,6 +392,11 @@ public sealed class TrayIconService : IDisposable
         if (_rigMenuItem != null)
         {
             _rigMenuItem.Checked = mode == ProfileMode.SimRig;
+        }
+
+        if (_audioToggleMenuItem != null)
+        {
+            _audioToggleMenuItem.Text = GetAudioToggleMenuText(_coordinator.CurrentAudioOutputMode);
         }
 
         int activeIndex = _coordinator.CurrentPresetIndex;
@@ -362,7 +431,86 @@ public sealed class TrayIconService : IDisposable
         }
     }
 
-    private static System.Drawing.Icon CreateProfileIcon(ProfileMode mode)
+    private void ApplyTooltip(ProfileMode mode, WorkstationPreset? preset, AudioOutputMode audioMode)
+    {
+        if (_notifyIcon == null)
+        {
+            return;
+        }
+
+        var activePreset = preset ?? _coordinator.CurrentPreset;
+        var presetName = activePreset?.Name ?? "Default";
+        var audioTag = audioMode == AudioOutputMode.Secondary ? " [Headset]" : " [Speakers]";
+
+        var tooltip = mode == ProfileMode.Desk
+            ? $"RigSwitch - Desk Setup ({presetName}){audioTag}"
+            : $"RigSwitch - Sim Rig Setup ({presetName}){audioTag}";
+
+        if (tooltip.Length > 63)
+        {
+            tooltip = tooltip[..63];
+        }
+
+        _notifyIcon.Text = tooltip;
+    }
+
+    /// <summary>
+    /// Loads the high-resolution profile icon for the specified mode from embedded pack resources,
+    /// falling back to local files or procedural GDI+ vector graphics if resources are unavailable.
+    /// </summary>
+    /// <param name="mode">The workstation profile mode.</param>
+    /// <returns>A new <see cref="System.Drawing.Icon"/> instance.</returns>
+    internal static System.Drawing.Icon LoadProfileIcon(ProfileMode mode)
+    {
+        var iconFileName = mode == ProfileMode.Desk ? "desk.ico" : "simrig.ico";
+
+        // 1. Attempt to load from WPF pack resource stream
+        try
+        {
+            var packUri = new Uri($"pack://application:,,,/RigSwitch.App;component/Assets/{iconFileName}", UriKind.Absolute);
+            var streamInfo = System.Windows.Application.GetResourceStream(packUri);
+            if (streamInfo?.Stream != null)
+            {
+                using var stream = streamInfo.Stream;
+                return new System.Drawing.Icon(stream);
+            }
+        }
+        catch
+        {
+            // Resource stream may not be available outside active WPF host or during tests
+        }
+
+        // 2. Attempt filesystem fallback search
+        var baseDir = AppContext.BaseDirectory;
+        string[] candidatePaths =
+        [
+            Path.Combine(baseDir, "Assets", iconFileName),
+            Path.Combine(baseDir, iconFileName),
+            Path.Combine(Directory.GetCurrentDirectory(), "src", "RigSwitch.App", "Assets", iconFileName),
+            Path.Combine(Directory.GetCurrentDirectory(), "Assets", iconFileName)
+        ];
+
+        foreach (var path in candidatePaths)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    using var fileStream = File.OpenRead(path);
+                    return new System.Drawing.Icon(fileStream);
+                }
+            }
+            catch
+            {
+                // Fall through to next candidate or procedural generation
+            }
+        }
+
+        // 3. Fallback to procedural GDI+ vector icon
+        return CreateVectorProfileIcon(mode);
+    }
+
+    private static System.Drawing.Icon CreateVectorProfileIcon(ProfileMode mode)
     {
         using var bitmap = new System.Drawing.Bitmap(32, 32);
         using (var g = System.Drawing.Graphics.FromImage(bitmap))

@@ -42,10 +42,31 @@ public sealed class WorkstationPresetTests
         // Assert
         Assert.Equal("Custom Preset", preset.Name);
         Assert.Equal("MON_1", preset.TargetMonitorId);
+        Assert.Single(preset.TargetMonitorIds, "MON_1");
         Assert.Equal("AUDIO_1", preset.PrimaryAudioId);
         Assert.Equal("AUDIO_2", preset.FallbackAudioId);
         Assert.Equal("Ctrl+Shift+1", preset.DirectHotkey);
         Assert.Single(preset.LaunchApplicationPaths, "C:\\app.exe");
+    }
+
+    [Fact]
+    public void WorkstationPreset_MultiMonitorSupport_MaintainsBackwardsCompatibility()
+    {
+        // Arrange
+        var preset = new WorkstationPreset
+        {
+            TargetMonitorIds = ["RIG_LEFT", "RIG_CENTER", "RIG_RIGHT"]
+        };
+
+        // Act & Assert
+        Assert.Equal(3, preset.TargetMonitorIds.Count);
+        Assert.Equal("RIG_LEFT", preset.TargetMonitorId); // Primary / first monitor
+
+        // Setting single TargetMonitorId updates the first monitor
+        preset.TargetMonitorId = "RIG_MAIN";
+        Assert.Equal("RIG_MAIN", preset.TargetMonitorIds[0]);
+        Assert.Equal("RIG_CENTER", preset.TargetMonitorIds[1]);
+        Assert.Equal("RIG_RIGHT", preset.TargetMonitorIds[2]);
     }
 
     [Fact]

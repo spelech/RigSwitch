@@ -40,6 +40,16 @@ public enum DISPLAYCONFIG_DEVICE_INFO_TYPE
     DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO = 9,
     DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE = 10,
     DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL = 11,
+    DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE = 16,
+}
+
+public enum DISPLAYCONFIG_COLOR_ENCODING : uint
+{
+    DISPLAYCONFIG_COLOR_ENCODING_RGB = 0,
+    DISPLAYCONFIG_COLOR_ENCODING_YCBCR444 = 1,
+    DISPLAYCONFIG_COLOR_ENCODING_YCBCR422 = 2,
+    DISPLAYCONFIG_COLOR_ENCODING_YCBCR420 = 3,
+    DISPLAYCONFIG_COLOR_ENCODING_INTENSITY = 4,
 }
 
 public enum DISPLAYCONFIG_MODE_INFO_TYPE : uint
@@ -260,6 +270,46 @@ public struct DISPLAYCONFIG_MODE_INFO
     public DISPLAYCONFIG_MODE_INFO_UNION modeInfo;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public struct DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO
+{
+    public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+    public uint value;
+    public DISPLAYCONFIG_COLOR_ENCODING colorEncoding;
+    public int bitsPerColorChannel;
+
+    public readonly bool advancedColorSupported => (value & 0x1) != 0;
+    public readonly bool advancedColorEnabled => (value & 0x2) != 0;
+    public readonly bool wideColorEnforced => (value & 0x4) != 0;
+    public readonly bool advancedColorForceDisabled => (value & 0x8) != 0;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE
+{
+    public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+    public uint value;
+
+    public bool enableAdvancedColor
+    {
+        readonly get => (value & 0x1) != 0;
+        set => this.value = value ? (this.value | 0x1u) : (this.value & ~0x1u);
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct DISPLAYCONFIG_SET_HDR_STATE
+{
+    public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+    public uint hdrState;
+
+    public bool enableHdr
+    {
+        readonly get => (hdrState & 0x1) != 0;
+        set => hdrState = value ? (hdrState | 0x1u) : (hdrState & ~0x1u);
+    }
+}
+
 /// <summary>
 /// Native P/Invoke declarations for Windows Connecting and Configuring Displays (CCD) APIs.
 /// </summary>
@@ -286,6 +336,18 @@ public static class NativeCcdApi
     [DllImport("user32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
     internal static extern int DisplayConfigGetDeviceInfo(
         ref DISPLAYCONFIG_TARGET_DEVICE_NAME deviceName);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    internal static extern int DisplayConfigGetDeviceInfo(
+        ref DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO request);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    internal static extern int DisplayConfigSetDeviceInfo(
+        ref DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE request);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    internal static extern int DisplayConfigSetDeviceInfo(
+        ref DISPLAYCONFIG_SET_HDR_STATE request);
 
     [DllImport("user32.dll", ExactSpelling = true)]
     internal static extern int SetDisplayConfig(

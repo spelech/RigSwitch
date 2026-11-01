@@ -2,6 +2,7 @@ namespace RigSwitch.Infrastructure.Windows.Ccd;
 
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using RigSwitch.Core.Enums;
 using RigSwitch.Core.Interfaces;
 using RigSwitch.Core.Models;
 
@@ -62,6 +63,10 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
 
             bool isPathActive = (path.flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0;
             bool isPathPrimary = false;
+            int posX = 0;
+            int posY = 0;
+            int width = 1920;
+            int height = 1080;
 
             if (isPathActive &&
                 path.sourceInfo.modeInfoIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID &&
@@ -70,8 +75,19 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
                 var mode = modes[path.sourceInfo.modeInfoIdx];
                 if (mode.infoType == DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
                 {
-                    isPathPrimary = mode.modeInfo.sourceMode.position.x == 0 &&
-                                    mode.modeInfo.sourceMode.position.y == 0;
+                    posX = mode.modeInfo.sourceMode.position.x;
+                    posY = mode.modeInfo.sourceMode.position.y;
+                    if (mode.modeInfo.sourceMode.width > 0)
+                    {
+                        width = (int)mode.modeInfo.sourceMode.width;
+                    }
+
+                    if (mode.modeInfo.sourceMode.height > 0)
+                    {
+                        height = (int)mode.modeInfo.sourceMode.height;
+                    }
+
+                    isPathPrimary = posX == 0 && posY == 0;
                 }
             }
 
@@ -81,6 +97,25 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
 
             string devicePath = devName.monitorDevicePath ?? string.Empty;
 
+            bool supportsHdr = false;
+            bool isHdrEnabled = false;
+            var colorInfo = new DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                {
+                    type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>(),
+                    adapterId = path.targetInfo.adapterId,
+                    id = path.targetInfo.id
+                }
+            };
+
+            if (_ccdProvider.GetAdvancedColorInfo(ref colorInfo) == 0)
+            {
+                supportsHdr = colorInfo.advancedColorSupported;
+                isHdrEnabled = colorInfo.advancedColorEnabled;
+            }
+
             if (displaysByMonitorId.TryGetValue(monitorId, out var existing))
             {
                 displaysByMonitorId[monitorId] = new DisplayDeviceInfo(
@@ -89,7 +124,13 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
                     friendlyName: string.IsNullOrWhiteSpace(existing.FriendlyName) ? friendlyName : existing.FriendlyName,
                     displayAdapter: existing.DisplayAdapter,
                     isActive: existing.IsActive || isPathActive,
-                    isPrimary: existing.IsPrimary || isPathPrimary);
+                    isPrimary: existing.IsPrimary || isPathPrimary,
+                    supportsHdr: existing.SupportsHdr || supportsHdr,
+                    isHdrEnabled: existing.IsHdrEnabled || isHdrEnabled,
+                    positionX: isPathActive ? posX : existing.PositionX,
+                    positionY: isPathActive ? posY : existing.PositionY,
+                    width: isPathActive ? width : existing.Width,
+                    height: isPathActive ? height : existing.Height);
             }
             else
             {
@@ -99,7 +140,13 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
                     friendlyName: friendlyName,
                     displayAdapter: string.Empty,
                     isActive: isPathActive,
-                    isPrimary: isPathPrimary);
+                    isPrimary: isPathPrimary,
+                    supportsHdr: supportsHdr,
+                    isHdrEnabled: isHdrEnabled,
+                    positionX: posX,
+                    positionY: posY,
+                    width: width,
+                    height: height);
             }
         }
 
@@ -108,12 +155,25 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
     }
 
     /// <inheritdoc/>
-    public Task ApplySingleDisplayTopologyAsync(
-        string targetMonitorId,
-        string? inactiveMonitorId,
+    public Task ApplyDisplayTopologyAsync(
+        IReadOnlyList<string> targetMonitorIds,
+        IReadOnlyList<string>? inactiveMonitorIds = null,
+        CancellationToken cancellationToken = default) =>
+        ApplyDisplayTopologyAsync(targetMonitorIds, inactiveMonitorIds, placements: null, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task ApplyDisplayTopologyAsync(
+        IReadOnlyList<string> targetMonitorIds,
+        IReadOnlyList<string>? inactiveMonitorIds,
+        IReadOnlyList<MonitorPlacement>? placements,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetMonitorId);
+        ArgumentNullException.ThrowIfNull(targetMonitorIds);
+        if (targetMonitorIds.Count == 0)
+        {
+            throw new ArgumentException("At least one target monitor ID must be provided.", nameof(targetMonitorIds));
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         int queryResult = _ccdProvider.QueryDisplayConfig(QueryDisplayFlags.QDC_ALL_PATHS, out var paths, out var modes);
@@ -147,66 +207,110 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
             }
         }
 
-        int targetIndex = -1;
-        for (int i = 0; i < paths.Length; i++)
+        var targetIndices = new List<int>();
+        foreach (var targetId in targetMonitorIds)
         {
-            var (monId, devPath, friendly) = pathTargetInfos[i];
-            if (MatchesMonitor(targetMonitorId, monId, devPath, friendly))
+            if (string.IsNullOrWhiteSpace(targetId))
             {
-                if (targetIndex == -1 || (paths[i].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                continue;
+            }
+
+            int matchIdx = -1;
+            for (int i = 0; i < paths.Length; i++)
+            {
+                var (monId, devPath, friendly) = pathTargetInfos[i];
+                if (MatchesMonitor(targetId, monId, devPath, friendly))
                 {
-                    targetIndex = i;
+                    if (matchIdx == -1 || (paths[i].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                    {
+                        matchIdx = i;
+                    }
                 }
+            }
+
+            if (matchIdx == -1)
+            {
+                throw new InvalidOperationException($"Target monitor '{targetId}' was not found on system.");
+            }
+
+            if (!targetIndices.Contains(matchIdx))
+            {
+                targetIndices.Add(matchIdx);
             }
         }
 
-        if (targetIndex == -1)
+        if (targetIndices.Count == 0)
         {
-            throw new InvalidOperationException($"Target monitor '{targetMonitorId}' was not found on system.");
+            throw new InvalidOperationException("None of the specified target monitors were found on the system.");
         }
 
         var clonedPaths = (DISPLAYCONFIG_PATH_INFO[])paths.Clone();
         var clonedModes = (DISPLAYCONFIG_MODE_INFO[])modes.Clone();
 
-        // Enable target path
-        clonedPaths[targetIndex].flags = NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE;
-
-        // Clear active flags on other paths matching target monitor
+        // Step 1: Disable all paths by default or matching inactives
         for (int i = 0; i < clonedPaths.Length; i++)
         {
-            if (i != targetIndex)
+            if (targetIndices.Contains(i))
+            {
+                continue;
+            }
+
+            if (inactiveMonitorIds != null && inactiveMonitorIds.Count > 0)
             {
                 var (monId, devPath, friendly) = pathTargetInfos[i];
-                if (MatchesMonitor(targetMonitorId, monId, devPath, friendly))
+                bool isInactive = inactiveMonitorIds.Any(inact => MatchesMonitor(inact, monId, devPath, friendly));
+                if (isInactive)
                 {
                     clonedPaths[i].flags = 0;
                 }
             }
-        }
-
-        // If inactiveMonitorId provided, clear DISPLAYCONFIG_PATH_ACTIVE (set flags = 0)
-        if (!string.IsNullOrWhiteSpace(inactiveMonitorId))
-        {
-            for (int i = 0; i < clonedPaths.Length; i++)
+            else
             {
-                if (i == targetIndex)
-                {
-                    continue;
-                }
-
-                var (monId, devPath, friendly) = pathTargetInfos[i];
-                if (MatchesMonitor(inactiveMonitorId, monId, devPath, friendly))
-                {
-                    clonedPaths[i].flags = 0;
-                }
+                // Clear active flag for non-target paths if inactive list not specified
+                clonedPaths[i].flags = 0;
             }
         }
 
-        // Updates source position of target to (0, 0) as primary
-        uint modeIdx = clonedPaths[targetIndex].sourceInfo.modeInfoIdx;
-        if (modeIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID && modeIdx < clonedModes.Length)
+        // Step 2: Enable target paths and position according to explicit placements or linear fallback
+        int offsetX = 0;
+        int offsetY = 0;
+        if (placements is { Count: > 0 })
         {
-            clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL { x = 0, y = 0 };
+            var primaryPlacement = placements.FirstOrDefault(p => p.IsPrimary) ?? placements[0];
+            offsetX = -primaryPlacement.PositionX;
+            offsetY = -primaryPlacement.PositionY;
+        }
+
+        int currentX = 0;
+        for (int tIdx = 0; tIdx < targetIndices.Count; tIdx++)
+        {
+            int pIndex = targetIndices[tIdx];
+            clonedPaths[pIndex].flags = NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE;
+
+            uint modeIdx = clonedPaths[pIndex].sourceInfo.modeInfoIdx;
+            if (modeIdx != NativeCcdApi.DISPLAYCONFIG_PATH_MODE_IDX_INVALID && modeIdx < clonedModes.Length)
+            {
+                var (monId, devPath, friendly) = pathTargetInfos[pIndex];
+                MonitorPlacement? matchedPlacement = placements?.FirstOrDefault(
+                    p => MatchesMonitor(p.MonitorId, monId, devPath, friendly));
+
+                if (matchedPlacement != null)
+                {
+                    clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL
+                    {
+                        x = matchedPlacement.PositionX + offsetX,
+                        y = matchedPlacement.PositionY + offsetY
+                    };
+                }
+                else
+                {
+                    clonedModes[modeIdx].modeInfo.sourceMode.position = new POINTL { x = currentX, y = 0 };
+                }
+
+                // If width is known and positive, advance currentX; otherwise increment by default width (1920)
+                int width = (int)clonedModes[modeIdx].modeInfo.sourceMode.width;
+                currentX += width > 0 ? width : 1920;
+            }
         }
 
         var flags = SetDisplayConfigFlags.SDC_APPLY |
@@ -221,6 +325,18 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task ApplySingleDisplayTopologyAsync(
+        string targetMonitorId,
+        string? inactiveMonitorId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetMonitorId);
+        var targetList = new[] { targetMonitorId };
+        var inactiveList = string.IsNullOrWhiteSpace(inactiveMonitorId) ? null : new[] { inactiveMonitorId };
+        return ApplyDisplayTopologyAsync(targetList, inactiveList, cancellationToken);
     }
 
     private static string ExtractMonitorId(in DISPLAYCONFIG_TARGET_DEVICE_NAME targetName)
@@ -280,5 +396,200 @@ public sealed class WindowsDisplayConfigurationService : IDisplayConfigurationSe
         }
 
         return false;
+    }
+
+    /// <inheritdoc/>
+    public Task<DisplayHdrInfo?> GetHdrInfoAsync(string monitorId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int queryResult = _ccdProvider.QueryDisplayConfig(QueryDisplayFlags.QDC_ALL_PATHS, out var paths, out _);
+        if (queryResult != 0)
+        {
+            throw new Win32Exception(queryResult, $"QueryDisplayConfig failed with error {queryResult}");
+        }
+
+        foreach (var path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var devName = new DISPLAYCONFIG_TARGET_DEVICE_NAME
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                {
+                    type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_TARGET_DEVICE_NAME>(),
+                    adapterId = path.targetInfo.adapterId,
+                    id = path.targetInfo.id
+                }
+            };
+
+            if (_ccdProvider.GetTargetDeviceName(ref devName) != 0)
+            {
+                continue;
+            }
+
+            string monId = ExtractMonitorId(devName);
+            if (!MatchesMonitor(monitorId, monId, devName.monitorDevicePath ?? string.Empty, devName.monitorFriendlyDeviceName ?? string.Empty))
+            {
+                continue;
+            }
+
+            var colorInfo = new DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                {
+                    type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>(),
+                    adapterId = path.targetInfo.adapterId,
+                    id = path.targetInfo.id
+                }
+            };
+
+            int colorResult = _ccdProvider.GetAdvancedColorInfo(ref colorInfo);
+            if (colorResult != 0)
+            {
+                return Task.FromResult<DisplayHdrInfo?>(null);
+            }
+
+            var colorEncoding = colorInfo.colorEncoding switch
+            {
+                DISPLAYCONFIG_COLOR_ENCODING.DISPLAYCONFIG_COLOR_ENCODING_RGB => DisplayColorEncoding.Rgb,
+                DISPLAYCONFIG_COLOR_ENCODING.DISPLAYCONFIG_COLOR_ENCODING_YCBCR444 => DisplayColorEncoding.Ycbcr444,
+                DISPLAYCONFIG_COLOR_ENCODING.DISPLAYCONFIG_COLOR_ENCODING_YCBCR422 => DisplayColorEncoding.Ycbcr422,
+                DISPLAYCONFIG_COLOR_ENCODING.DISPLAYCONFIG_COLOR_ENCODING_YCBCR420 => DisplayColorEncoding.Ycbcr420,
+                DISPLAYCONFIG_COLOR_ENCODING.DISPLAYCONFIG_COLOR_ENCODING_INTENSITY => DisplayColorEncoding.Intensity,
+                _ => DisplayColorEncoding.Unspecified
+            };
+
+            var hdrInfo = new DisplayHdrInfo(
+                MonitorId: monId,
+                SupportsHdr: colorInfo.advancedColorSupported,
+                IsHdrEnabled: colorInfo.advancedColorEnabled,
+                WideColorEnforced: colorInfo.wideColorEnforced,
+                ColorEncoding: colorEncoding,
+                BitsPerColorChannel: colorInfo.bitsPerColorChannel);
+
+            return Task.FromResult<DisplayHdrInfo?>(hdrInfo);
+        }
+
+        return Task.FromResult<DisplayHdrInfo?>(null);
+    }
+
+    /// <inheritdoc/>
+    public Task SetHdrStateAsync(string monitorId, bool enableHdr, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int queryResult = _ccdProvider.QueryDisplayConfig(QueryDisplayFlags.QDC_ALL_PATHS, out var paths, out _);
+        if (queryResult != 0)
+        {
+            throw new Win32Exception(queryResult, $"QueryDisplayConfig failed with error {queryResult}");
+        }
+
+        DISPLAYCONFIG_PATH_INFO? matchedPath = null;
+        for (int i = 0; i < paths.Length; i++)
+        {
+            var devName = new DISPLAYCONFIG_TARGET_DEVICE_NAME
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                {
+                    type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_TARGET_DEVICE_NAME>(),
+                    adapterId = paths[i].targetInfo.adapterId,
+                    id = paths[i].targetInfo.id
+                }
+            };
+
+            if (_ccdProvider.GetTargetDeviceName(ref devName) == 0)
+            {
+                string monId = ExtractMonitorId(devName);
+                if (MatchesMonitor(monitorId, monId, devName.monitorDevicePath ?? string.Empty, devName.monitorFriendlyDeviceName ?? string.Empty))
+                {
+                    matchedPath = paths[i];
+                    if ((paths[i].flags & NativeCcdApi.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (matchedPath == null)
+        {
+            throw new InvalidOperationException($"Target monitor '{monitorId}' was not found on system.");
+        }
+
+        var pathVal = matchedPath.Value;
+        var colorInfo = new DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO
+        {
+            header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+            {
+                type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO,
+                size = (uint)Marshal.SizeOf<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>(),
+                adapterId = pathVal.targetInfo.adapterId,
+                id = pathVal.targetInfo.id
+            }
+        };
+
+        int colorResult = _ccdProvider.GetAdvancedColorInfo(ref colorInfo);
+        if (colorResult != 0)
+        {
+            throw new Win32Exception(colorResult, $"Failed to query Advanced Color info for monitor '{monitorId}'. Error code: {colorResult}");
+        }
+
+        if (!colorInfo.advancedColorSupported)
+        {
+            throw new NotSupportedException($"Monitor '{monitorId}' does not support HDR / Advanced Color.");
+        }
+
+        // Flicker-free optimization: If already in requested state, skip set call!
+        if (colorInfo.advancedColorEnabled == enableHdr)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Dual-strategy application:
+        // Try type 16 (DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE, modern Windows 11 24H2+)
+        var hdrState = new DISPLAYCONFIG_SET_HDR_STATE
+        {
+            header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+            {
+                type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE,
+                size = (uint)Marshal.SizeOf<DISPLAYCONFIG_SET_HDR_STATE>(),
+                adapterId = pathVal.targetInfo.adapterId,
+                id = pathVal.targetInfo.id
+            },
+            enableHdr = enableHdr
+        };
+
+        int setResult = _ccdProvider.SetHdrState(ref hdrState);
+
+        // If type 16 is not supported or returns error 50/87, fall back to type 10 (DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE)
+        if (setResult == 50 || setResult == 87)
+        {
+            var advColor = new DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                {
+                    type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE>(),
+                    adapterId = pathVal.targetInfo.adapterId,
+                    id = pathVal.targetInfo.id
+                },
+                enableAdvancedColor = enableHdr
+            };
+
+            setResult = _ccdProvider.SetAdvancedColorState(ref advColor);
+        }
+
+        if (setResult != 0)
+        {
+            throw new Win32Exception(setResult, $"Failed to set HDR state to {enableHdr} on monitor '{monitorId}'. Error code: {setResult}");
+        }
+
+        return Task.CompletedTask;
     }
 }

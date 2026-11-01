@@ -128,15 +128,138 @@ public sealed record UserSettings
         }
     }
 
+    private string _deskPrimaryMicrophoneId = string.Empty;
+    private string _deskFallbackMicrophoneId = string.Empty;
+    private string _rigPrimaryMicrophoneId = string.Empty;
+    private string _rigFallbackMicrophoneId = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the primary microphone endpoint GUID identifier for the active Desk preset.
+    /// </summary>
+    public string DeskPrimaryMicrophoneId
+    {
+        get => DeskPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.Desk).PrimaryMicrophoneId : _deskPrimaryMicrophoneId;
+        set
+        {
+            _deskPrimaryMicrophoneId = value ?? string.Empty;
+            if (DeskPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.Desk).PrimaryMicrophoneId = _deskPrimaryMicrophoneId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the fallback microphone endpoint GUID identifier for the active Desk preset.
+    /// </summary>
+    public string DeskFallbackMicrophoneId
+    {
+        get => DeskPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.Desk).FallbackMicrophoneId : _deskFallbackMicrophoneId;
+        set
+        {
+            _deskFallbackMicrophoneId = value ?? string.Empty;
+            if (DeskPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.Desk).FallbackMicrophoneId = _deskFallbackMicrophoneId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the primary microphone endpoint GUID identifier for the active Sim Rig preset.
+    /// </summary>
+    public string RigPrimaryMicrophoneId
+    {
+        get => RigPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.SimRig).PrimaryMicrophoneId : _rigPrimaryMicrophoneId;
+        set
+        {
+            _rigPrimaryMicrophoneId = value ?? string.Empty;
+            if (RigPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.SimRig).PrimaryMicrophoneId = _rigPrimaryMicrophoneId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the fallback microphone endpoint GUID identifier for the active Sim Rig preset.
+    /// </summary>
+    public string RigFallbackMicrophoneId
+    {
+        get => RigPresets is { Count: > 0 } ? GetActivePreset(ProfileMode.SimRig).FallbackMicrophoneId : _rigFallbackMicrophoneId;
+        set
+        {
+            _rigFallbackMicrophoneId = value ?? string.Empty;
+            if (RigPresets is { Count: > 0 })
+            {
+                GetActivePreset(ProfileMode.SimRig).FallbackMicrophoneId = _rigFallbackMicrophoneId;
+            }
+        }
+    }
+
+    private Dictionary<string, string> _customDeviceNames = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _cachedDeviceNames = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _cachedDisplayResolutions = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets or sets the last-known resolution ("WIDTHxHEIGHT") of each display, recorded while it was active.
+    /// Windows reports no real mode for inactive (disabled) displays, so this preserves their true size.
+    /// </summary>
+    public Dictionary<string, string> CachedDisplayResolutions
+    {
+        get => _cachedDisplayResolutions;
+        set => _cachedDisplayResolutions = value != null
+            ? new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// Gets or sets user-defined friendly name overrides keyed by device identifier.
     /// </summary>
-    public Dictionary<string, string> CustomDeviceNames { get; set; } = new();
+    public Dictionary<string, string> CustomDeviceNames
+    {
+        get => _customDeviceNames;
+        set => _customDeviceNames = value != null
+            ? new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Gets or sets cached friendly display names for known devices, keyed by hardware or endpoint ID.
+    /// </summary>
+    public Dictionary<string, string> CachedDeviceNames
+    {
+        get => _cachedDeviceNames;
+        set => _cachedDeviceNames = value != null
+            ? new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Gets or sets the list of audio endpoint GUID identifiers to hide or disable.
     /// </summary>
     public List<string> HiddenAudioEndpointIds { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the list of audio endpoint GUID identifiers excluded from default audio routing (e.g. bass shaker DACs).
+    /// </summary>
+    public List<string> BlacklistedAudioEndpointIds { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the hotkey combination used to toggle between primary and secondary audio endpoints.
+    /// </summary>
+    public string AudioToggleHotkey { get; set; } = "Ctrl+Alt+A";
+
+    /// <summary>
+    /// Gets or sets a value indicating whether primary audio is continuously enforced in the background.
+    /// When false, audio is routed only upon profile or preset switching, leaving subsequent manual switches intact.
+    /// </summary>
+    public bool EnforcePrimaryAudio { get; set; }
+
+    /// <summary>
+    /// Gets or sets the active audio output destination mode.
+    /// </summary>
+    public AudioOutputMode ActiveAudioOutputMode { get; set; } = AudioOutputMode.Primary;
 
     /// <summary>
     /// Gets or sets the hotkey combination used to toggle between Desk and Sim Rig profiles.
@@ -162,6 +285,21 @@ public sealed record UserSettings
     /// Gets or sets a value indicating whether Windows toast notifications are displayed on profile changes.
     /// </summary>
     public bool ShowToastNotifications { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether automatic update checks are performed on application startup.
+    /// </summary>
+    public bool EnableAutoUpdateCheck { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a specific release version tag that the user has chosen to ignore.
+    /// </summary>
+    public string IgnoredReleaseVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a timestamp until which update notification dialogs should be delayed.
+    /// </summary>
+    public DateTime? UpdateCheckSkippedUntil { get; set; }
 
     /// <summary>
     /// Gets the currently active workstation preset for the specified profile mode safely.
@@ -198,4 +336,20 @@ public sealed record UserSettings
 
         return (idx >= 0 && idx < list.Count) ? list[idx] : list[0];
     }
+}
+
+/// <summary>
+/// Specifies the audio output destination mode (primary speakers vs secondary headset or virtual device).
+/// </summary>
+public enum AudioOutputMode
+{
+    /// <summary>
+    /// Routes playback and capture to the primary audio endpoints.
+    /// </summary>
+    Primary = 0,
+
+    /// <summary>
+    /// Routes playback and capture to the secondary audio endpoints.
+    /// </summary>
+    Secondary = 1,
 }
