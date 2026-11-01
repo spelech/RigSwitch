@@ -30,4 +30,14 @@ public interface IAudioEndpointWatchdogService : IDisposable
     /// </summary>
     /// <param name="endpointId">The endpoint device identifier being intentionally switched to.</param>
     void NotifyIntentionalSwitch(string endpointId);
+
+    /// <summary>
+    /// Suppresses watchdog actions during a profile switch operation.
+    /// </summary>
+    void BeginProfileSwitch();
+
+    /// <summary>
+    /// Resumes watchdog actions after a profile switch operation finishes.
+    /// </summary>
+    void EndProfileSwitch();
 }

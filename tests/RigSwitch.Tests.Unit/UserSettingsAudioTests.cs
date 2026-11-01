@@ -21,7 +21,7 @@ public sealed class UserSettingsAudioTests
         var settings = new UserSettings();
         Assert.Empty(settings.BlacklistedAudioEndpointIds);
         Assert.Equal("Ctrl+Alt+A", settings.AudioToggleHotkey);
-        Assert.True(settings.EnforcePrimaryAudio);
+        Assert.False(settings.EnforcePrimaryAudio);
         Assert.Equal(AudioOutputMode.Primary, settings.ActiveAudioOutputMode);
     }
 

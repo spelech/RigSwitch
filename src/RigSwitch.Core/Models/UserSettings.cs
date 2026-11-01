@@ -251,9 +251,10 @@ public sealed record UserSettings
     public string AudioToggleHotkey { get; set; } = "Ctrl+Alt+A";
 
     /// <summary>
-    /// Gets or sets a value indicating whether primary audio is strictly enforced upon profile activation.
+    /// Gets or sets a value indicating whether primary audio is continuously enforced in the background.
+    /// When false, audio is routed only upon profile or preset switching, leaving subsequent manual switches intact.
     /// </summary>
-    public bool EnforcePrimaryAudio { get; set; } = true;
+    public bool EnforcePrimaryAudio { get; set; }
 
     /// <summary>
     /// Gets or sets the active audio output destination mode.

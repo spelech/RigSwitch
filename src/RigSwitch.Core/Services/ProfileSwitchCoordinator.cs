@@ -20,6 +20,9 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     private bool _disposed;
     private UserSettings? _settings;
 
+    private readonly Action? _onProfileSwitchStarting;
+    private readonly Action? _onProfileSwitchCompleted;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ProfileSwitchCoordinator"/> class.
     /// </summary>
@@ -29,13 +32,17 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
     /// <param name="initialProfile">The initial workstation profile mode.</param>
     /// <param name="appHookService">Optional application lifecycle hook service.</param>
     /// <param name="onIntentionalAudioSwitch">Optional callback invoked with the resolved endpoint ID immediately before switching playback audio.</param>
+    /// <param name="onProfileSwitchStarting">Optional callback invoked when profile switching starts.</param>
+    /// <param name="onProfileSwitchCompleted">Optional callback invoked when profile switching finishes.</param>
     public ProfileSwitchCoordinator(
         IDisplayConfigurationService displayConfigService,
         IAudioEndpointDirector audioDirector,
         ISettingsStorageService settingsStorageService,
         ProfileMode initialProfile = ProfileMode.Desk,
         IApplicationLifecycleHookService? appHookService = null,
-        Action<string>? onIntentionalAudioSwitch = null)
+        Action<string>? onIntentionalAudioSwitch = null,
+        Action? onProfileSwitchStarting = null,
+        Action? onProfileSwitchCompleted = null)
     {
         ArgumentNullException.ThrowIfNull(displayConfigService);
         ArgumentNullException.ThrowIfNull(audioDirector);
@@ -46,6 +53,8 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         _settingsStorageService = settingsStorageService;
         _appHookService = appHookService;
         _onIntentionalAudioSwitch = onIntentionalAudioSwitch;
+        _onProfileSwitchStarting = onProfileSwitchStarting;
+        _onProfileSwitchCompleted = onProfileSwitchCompleted;
         CurrentProfile = initialProfile;
     }
 
@@ -111,7 +120,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
             var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
             var blacklisted = settings.BlacklistedAudioEndpointIds ?? [];
-            var allowedEndpoints = endpointList.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList();
+            var allowedEndpoints = endpointList.Where(e => !MatchesBlacklist(e, blacklisted, settings.CachedDeviceNames)).ToList();
             var playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
             var captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
 
@@ -120,26 +129,26 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
 
             if (preset.AudioPriorityIds is { Count: > 0 })
             {
-                resolvedAudioId = ResolveNextCycledRankedEndpoint(preset.AudioPriorityIds, playbackEndpoints, blacklisted, isPlayback: true);
+                resolvedAudioId = ResolveNextCycledRankedEndpoint(preset.AudioPriorityIds, playbackEndpoints, blacklisted, isPlayback: true, settings.CachedDeviceNames);
             }
             else
             {
                 var targetAudioId = newMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
                     ? preset.SecondaryAudioId
                     : preset.PrimaryAudioId;
-                resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
+                resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted, settings.CachedDeviceNames);
             }
 
             if (preset.MicrophonePriorityIds is { Count: > 0 })
             {
-                resolvedMicId = ResolveNextCycledRankedEndpoint(preset.MicrophonePriorityIds, captureEndpoints, blacklisted, isPlayback: false);
+                resolvedMicId = ResolveNextCycledRankedEndpoint(preset.MicrophonePriorityIds, captureEndpoints, blacklisted, isPlayback: false, settings.CachedDeviceNames);
             }
             else
             {
                 var targetMicId = newMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryMicrophoneId)
                     ? preset.SecondaryMicrophoneId
                     : preset.PrimaryMicrophoneId;
-                resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted);
+                resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted, settings.CachedDeviceNames);
             }
 
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
@@ -167,6 +176,7 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        _onProfileSwitchStarting?.Invoke();
         var previousProfile = CurrentProfile;
         WorkstationPreset? previousPreset = null;
         WorkstationPreset? preset = null;
@@ -271,21 +281,46 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             var endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
             var endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
             var blacklisted = settings.BlacklistedAudioEndpointIds ?? [];
-            var allowedEndpoints = endpointList.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList();
+            var allowedEndpoints = endpointList.Where(e => !MatchesBlacklist(e, blacklisted, settings.CachedDeviceNames)).ToList();
             var playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
             var captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
+
+            string? topTargetCandidate = preset.AudioPriorityIds is { Count: > 0 }
+                ? preset.AudioPriorityIds.FirstOrDefault(id => !string.IsNullOrWhiteSpace(id))
+                : (settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
+                    ? preset.SecondaryAudioId
+                    : preset.PrimaryAudioId);
+
+            if (!string.IsNullOrWhiteSpace(topTargetCandidate) &&
+                !IsCandidateActive(topTargetCandidate, playbackEndpoints, settings.CachedDeviceNames))
+            {
+                for (int attempt = 0; attempt < 10; attempt++)
+                {
+                    await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                    endpoints = await _audioDirector.EnumerateAudioEndpointsAsync(cancellationToken).ConfigureAwait(false);
+                    endpointList = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
+                    allowedEndpoints = endpointList.Where(e => !MatchesBlacklist(e, blacklisted, settings.CachedDeviceNames)).ToList();
+                    playbackEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Playback).ToList();
+                    captureEndpoints = allowedEndpoints.Where(e => e.Flow == AudioDeviceFlow.Capture).ToList();
+
+                    if (IsCandidateActive(topTargetCandidate, playbackEndpoints, settings.CachedDeviceNames))
+                    {
+                        break;
+                    }
+                }
+            }
 
             string? resolvedAudioId;
             if (preset.AudioPriorityIds is { Count: > 0 })
             {
-                resolvedAudioId = ResolveRankedAudioEndpoint(preset.AudioPriorityIds, playbackEndpoints, blacklisted);
+                resolvedAudioId = ResolveRankedAudioEndpoint(preset.AudioPriorityIds, playbackEndpoints, blacklisted, settings.CachedDeviceNames);
             }
             else
             {
                 var targetAudioId = settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryAudioId)
                     ? preset.SecondaryAudioId
                     : preset.PrimaryAudioId;
-                resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted);
+                resolvedAudioId = ResolveAudioEndpoint(targetAudioId, preset.FallbackAudioId, playbackEndpoints, blacklisted, settings.CachedDeviceNames);
             }
 
             if (!string.IsNullOrWhiteSpace(resolvedAudioId))
@@ -297,14 +332,14 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
             string? resolvedMicId;
             if (preset.MicrophonePriorityIds is { Count: > 0 })
             {
-                resolvedMicId = ResolveRankedAudioEndpoint(preset.MicrophonePriorityIds, captureEndpoints, blacklisted);
+                resolvedMicId = ResolveRankedAudioEndpoint(preset.MicrophonePriorityIds, captureEndpoints, blacklisted, settings.CachedDeviceNames);
             }
             else
             {
                 var targetMicId = settings.ActiveAudioOutputMode == AudioOutputMode.Secondary && !string.IsNullOrWhiteSpace(preset.SecondaryMicrophoneId)
                     ? preset.SecondaryMicrophoneId
                     : preset.PrimaryMicrophoneId;
-                resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted);
+                resolvedMicId = ResolveAudioEndpoint(targetMicId, preset.FallbackMicrophoneId, captureEndpoints, blacklisted, settings.CachedDeviceNames);
             }
 
             if (!string.IsNullOrWhiteSpace(resolvedMicId))
@@ -443,14 +478,54 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         }
         finally
         {
+            _onProfileSwitchCompleted?.Invoke();
             _gate.Release();
         }
+    }
+
+    private static bool MatchesBlacklist(
+        AudioEndpointInfo endpoint,
+        IReadOnlyList<string>? blacklisted,
+        IDictionary<string, string>? cachedNames)
+    {
+        if (blacklisted == null || blacklisted.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var b in blacklisted)
+        {
+            if (string.IsNullOrWhiteSpace(b))
+            {
+                continue;
+            }
+
+            if (MatchesEndpoint(b, endpoint.Id))
+            {
+                return true;
+            }
+
+            if (MatchesFriendlyName(b, endpoint.Name, cachedNames))
+            {
+                return true;
+            }
+
+            if (cachedNames != null && cachedNames.TryGetValue(b, out var cachedBlacklistName) &&
+                !string.IsNullOrWhiteSpace(cachedBlacklistName) &&
+                string.Equals(cachedBlacklistName, endpoint.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string? ResolveRankedAudioEndpoint(
         IReadOnlyList<string> rankedIds,
         IList<AudioEndpointInfo> allowedEndpoints,
-        IReadOnlyList<string>? blacklisted = null)
+        IReadOnlyList<string>? blacklisted = null,
+        IDictionary<string, string>? cachedNames = null)
     {
         foreach (var candidateId in rankedIds)
         {
@@ -464,22 +539,25 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                 continue;
             }
 
-            var activeMatch = allowedEndpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, candidateId) && e.State == DevicePresenceState.Active);
+            var activeMatch = allowedEndpoints.FirstOrDefault(e =>
+                (MatchesEndpoint(e.Id, candidateId) || MatchesFriendlyName(candidateId, e.Name, cachedNames)) &&
+                e.State == DevicePresenceState.Active &&
+                !MatchesBlacklist(e, blacklisted, cachedNames));
             if (activeMatch != null)
             {
                 return activeMatch.Id;
             }
         }
 
-        var firstActive = allowedEndpoints.FirstOrDefault(e => e.State == DevicePresenceState.Active);
-        return firstActive?.Id;
+        return null;
     }
 
     private static string? ResolveNextCycledRankedEndpoint(
         IReadOnlyList<string> rankedIds,
         IList<AudioEndpointInfo> allowedEndpoints,
         IReadOnlyList<string>? blacklisted,
-        bool isPlayback)
+        bool isPlayback,
+        IDictionary<string, string>? cachedNames = null)
     {
         var activeRanked = new List<AudioEndpointInfo>();
         foreach (var candidateId in rankedIds)
@@ -494,7 +572,9 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
                 continue;
             }
 
-            var match = allowedEndpoints.FirstOrDefault(e => MatchesEndpoint(e.Id, candidateId) && e.State == DevicePresenceState.Active);
+            var match = allowedEndpoints.FirstOrDefault(e =>
+                (MatchesEndpoint(e.Id, candidateId) || MatchesFriendlyName(candidateId, e.Name, cachedNames)) &&
+                e.State == DevicePresenceState.Active);
             if (match != null && !activeRanked.Any(x => MatchesEndpoint(x.Id, match.Id)))
             {
                 activeRanked.Add(match);
@@ -520,7 +600,8 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         string? primaryAudioId,
         string? fallbackAudioId,
         IEnumerable<AudioEndpointInfo> endpoints,
-        IReadOnlyList<string>? blacklisted = null)
+        IReadOnlyList<string>? blacklisted = null,
+        IDictionary<string, string>? cachedNames = null)
     {
         if (string.IsNullOrWhiteSpace(primaryAudioId) && string.IsNullOrWhiteSpace(fallbackAudioId))
         {
@@ -534,12 +615,14 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
         var effectiveFallback = isFallbackBlacklisted ? null : fallbackAudioId;
 
         var candidates = endpoints as IList<AudioEndpointInfo> ?? endpoints.ToList();
-        var allowedCandidates = blacklisted != null
-            ? candidates.Where(e => !blacklisted.Any(b => MatchesEndpoint(b, e.Id))).ToList()
-            : candidates;
+        var allowedCandidates = candidates.Where(e => !MatchesBlacklist(e, blacklisted, cachedNames)).ToList();
 
-        var primaryMatch = allowedCandidates.FirstOrDefault(e => MatchesEndpoint(e.Id, effectivePrimary) && e.State == DevicePresenceState.Active);
-        var fallbackMatch = allowedCandidates.FirstOrDefault(e => MatchesEndpoint(e.Id, effectiveFallback) && e.State == DevicePresenceState.Active);
+        var primaryMatch = allowedCandidates.FirstOrDefault(e =>
+            (MatchesEndpoint(e.Id, effectivePrimary) || MatchesFriendlyName(effectivePrimary, e.Name, cachedNames)) &&
+            e.State == DevicePresenceState.Active);
+        var fallbackMatch = allowedCandidates.FirstOrDefault(e =>
+            (MatchesEndpoint(e.Id, effectiveFallback) || MatchesFriendlyName(effectiveFallback, e.Name, cachedNames)) &&
+            e.State == DevicePresenceState.Active);
 
         if (!string.IsNullOrWhiteSpace(effectivePrimary) && primaryMatch != null)
         {
@@ -565,6 +648,48 @@ public sealed partial class ProfileSwitchCoordinator : IProfileSwitchCoordinator
 
         var directMatch = allowedCandidates.FirstOrDefault(e => MatchesEndpoint(e.Id, targetId));
         return directMatch?.Id ?? targetId;
+    }
+
+    private static bool IsCandidateActive(
+        string candidateId,
+        IEnumerable<AudioEndpointInfo> endpoints,
+        IDictionary<string, string>? cachedNames)
+    {
+        return endpoints.Any(e => e.State == DevicePresenceState.Active &&
+            (MatchesEndpoint(e.Id, candidateId) || MatchesFriendlyName(candidateId, e.Name, cachedNames)));
+    }
+
+    private static bool MatchesFriendlyName(string? candidateId, string? endpointName, IDictionary<string, string>? cachedNames)
+    {
+        if (string.IsNullOrWhiteSpace(candidateId) || string.IsNullOrWhiteSpace(endpointName) || cachedNames == null)
+        {
+            return false;
+        }
+
+        if (cachedNames.TryGetValue(candidateId, out var candidateName) && !string.IsNullOrWhiteSpace(candidateName))
+        {
+            if (string.Equals(candidateName, endpointName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var candidateModel = ExtractModelPrefix(candidateName);
+            var endpointModel = ExtractModelPrefix(endpointName);
+            if (!string.IsNullOrWhiteSpace(candidateModel) &&
+                !string.IsNullOrWhiteSpace(endpointModel) &&
+                string.Equals(candidateModel, endpointModel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string ExtractModelPrefix(string name)
+    {
+        int parenIdx = name.IndexOf('(');
+        return (parenIdx > 0 ? name[..parenIdx] : name).Trim();
     }
 
     private static bool IsDisplayConnected(string targetMonitorId, IEnumerable<DisplayDeviceInfo> displays)

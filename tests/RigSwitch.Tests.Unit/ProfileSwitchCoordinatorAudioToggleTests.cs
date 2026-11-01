@@ -310,5 +310,197 @@ public sealed class ProfileSwitchCoordinatorAudioToggleTests
         // Since {SPEAKERS} is currently IsDefaultPlayback=true, cycling advances to {HEADSET}
         await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync("{HEADSET}", Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task SwitchProfile_WhenEndpointGuidChanges_MatchesByFriendlyModelName()
+    {
+        var settings = new UserSettings
+        {
+            CachedDeviceNames = new Dictionary<string, string>
+            {
+                ["{OLD-GUID}"] = "VG34VQL3A (NVIDIA High Definition Audio)"
+            },
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    TargetMonitorIds = ["AUS3438"],
+                    AudioPriorityIds = ["{OLD-GUID}", "{FALLBACK}"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("AUS3438", @"\\.\DISPLAY1", "VG34", "NVIDIA", true, true)]);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{NEW-GUID}", "VG34VQL3A (NVIDIA High Definition Audio)", "NVIDIA", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback),
+            new("{FALLBACK}", "SteelSeries Sonar - Gaming", "SteelSeries", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>()).Returns(endpoints);
+
+        var coordinator = new ProfileSwitchCoordinator(_displayManager, _audioDirector, _storageService);
+        var success = await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        Assert.True(success);
+        await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync("{NEW-GUID}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchProfile_WhenTopTargetAudioEndpointNotYetActive_WaitsForSettlingAndRoutesWhenActive()
+    {
+        var settings = new UserSettings
+        {
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    TargetMonitorIds = ["AUS3438"],
+                    AudioPriorityIds = ["{VG34}", "{FALLBACK}"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("AUS3438", @"\\.\DISPLAY1", "VG34", "NVIDIA", true, true)]);
+
+        var initialEndpoints = new List<AudioEndpointInfo>
+        {
+            new("{VG34}", "VG34VQL3A (NVIDIA High Definition Audio)", "NVIDIA", DevicePresenceState.NotPresent, false, false, AudioDeviceFlow.Playback),
+            new("{FALLBACK}", "SteelSeries Sonar - Gaming", "SteelSeries", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        var settledEndpoints = new List<AudioEndpointInfo>
+        {
+            new("{VG34}", "VG34VQL3A (NVIDIA High Definition Audio)", "NVIDIA", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback),
+            new("{FALLBACK}", "SteelSeries Sonar - Gaming", "SteelSeries", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+
+        int callCount = 0;
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                callCount++;
+                return Task.FromResult<IReadOnlyList<AudioEndpointInfo>>(callCount == 1 ? initialEndpoints : settledEndpoints);
+            });
+
+        var coordinator = new ProfileSwitchCoordinator(_displayManager, _audioDirector, _storageService);
+        var success = await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        Assert.True(success);
+        Assert.True(callCount >= 2);
+        await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync("{VG34}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchProfile_InvokesProfileSwitchCallbacks()
+    {
+        var settings = new UserSettings
+        {
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    TargetMonitorIds = ["MON1"],
+                    AudioPriorityIds = ["{SPK}"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("MON1", @"\\.\DISPLAY1", "MON1", "NVIDIA", true, true)]);
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>())
+            .Returns([new AudioEndpointInfo("{SPK}", "Speakers", "Realtek", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)]);
+
+        bool startingCalled = false;
+        bool completedCalled = false;
+
+        var coordinator = new ProfileSwitchCoordinator(
+            _displayManager,
+            _audioDirector,
+            _storageService,
+            onProfileSwitchStarting: () => startingCalled = true,
+            onProfileSwitchCompleted: () => completedCalled = true);
+
+        var success = await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        Assert.True(success);
+        Assert.True(startingCalled);
+        Assert.True(completedCalled);
+    }
+
+    [Fact]
+    public async Task SwitchProfile_FiltersOutBlacklistedAudioEndpoints_ByFriendlyName()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{OLD-SHAKER-GUID}"],
+            CachedDeviceNames = new Dictionary<string, string>
+            {
+                ["{OLD-SHAKER-GUID}"] = "Pedals - Nobsound (USB2.0 Device)"
+            },
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{OFFLINE-ID}",
+                    FallbackAudioId = string.Empty,
+                    TargetMonitorIds = ["MONITOR-1"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("MONITOR-1", @"\\.\DISPLAY1", "OLED", "GPU", true, true)]);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{NEW-SHAKER-GUID}", "Pedals - Nobsound (USB2.0 Device)", "USB", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback),
+            new("{SPEAKERS}", "Pebble V3", "Realtek", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>()).Returns(endpoints);
+
+        var coordinator = new ProfileSwitchCoordinator(_displayManager, _audioDirector, _storageService);
+        await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        // Crucial: Must match friendly name and NOT route to {NEW-SHAKER-GUID}
+        await _audioDirector.Received(1).SetDefaultPlaybackEndpointAsync("{SPEAKERS}", Arg.Any<CancellationToken>());
+        await _audioDirector.DidNotReceive().SetDefaultPlaybackEndpointAsync("{NEW-SHAKER-GUID}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchProfile_WhenRankedEndpointsOffline_DoesNotPickActiveShaker()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{SHAKER-FOXI}"],
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    AudioPriorityIds = ["{MONITOR-AUDIO}"],
+                    TargetMonitorIds = ["MONITOR-1"]
+                }
+            ]
+        };
+        _storageService.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        _displayManager.EnumerateDisplaysAsync(Arg.Any<CancellationToken>())
+            .Returns([new DisplayDeviceInfo("MONITOR-1", @"\\.\DISPLAY1", "OLED", "GPU", true, true)]);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{MONITOR-AUDIO}", "MSI MPG341CX OLED", "NVIDIA", DevicePresenceState.NotPresent, false, false, AudioDeviceFlow.Playback),
+            new("{SHAKER-FOXI}", "Chassis - Fosi BST-1 (USB Audio Adapter)", "USB", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback)
+        };
+        _audioDirector.EnumerateAudioEndpointsAsync(Arg.Any<CancellationToken>()).Returns(endpoints);
+
+        var coordinator = new ProfileSwitchCoordinator(_displayManager, _audioDirector, _storageService);
+        await coordinator.SwitchProfileAsync(ProfileMode.Desk);
+
+        // Must NOT route to shaker
+        await _audioDirector.DidNotReceive().SetDefaultPlaybackEndpointAsync("{SHAKER-FOXI}", Arg.Any<CancellationToken>());
+    }
 }
 

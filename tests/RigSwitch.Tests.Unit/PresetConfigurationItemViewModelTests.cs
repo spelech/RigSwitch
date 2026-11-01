@@ -161,4 +161,90 @@ public sealed class PresetConfigurationItemViewModelTests
         Assert.Equal(80, vm.PlaybackVolumePercent);
         Assert.Equal(90, vm.MicrophoneVolumePercent);
     }
+
+    [Fact]
+    public void PresetConfigurationItemViewModel_UpgradesStale1080pPlacementWhenNativeResolutionIsKnown()
+    {
+        var preset = new WorkstationPreset
+        {
+            Name = "Sim Rig GT3",
+            TargetMonitorIds = ["AUS3438"],
+            MonitorPlacements =
+            [
+                new MonitorPlacement("AUS3438", 0, 0, 1920, 1080, true, PresetHdrMode.Retain)
+            ]
+        };
+
+        var vm = new PresetConfigurationItemViewModel(preset, 0, "RigGroup", true);
+
+        // Initially hydrated without native display information, placement preserves 1080p
+        vm.HydrateHardwareContext(
+            displays: [],
+            audioEndpoints: [],
+            customNames: new Dictionary<string, string>(),
+            cachedNames: new Dictionary<string, string>(),
+            blacklistedIds: []);
+
+        Assert.Equal(1920, vm.StageMonitors[0].Width);
+        Assert.Equal(1080, vm.StageMonitors[0].Height);
+
+        // When hydrated with 3440x1440 native resolution (from cached resolutions or display service)
+        var displays = new List<DisplayDeviceInfo>
+        {
+            new("AUS3438", @"\\.\DISPLAY2", "VG34VQL3A", "NVIDIA", false, false, supportsHdr: false, isHdrEnabled: false, positionX: 0, positionY: 0, width: 3440, height: 1440)
+        };
+        var cachedResolutions = new Dictionary<string, string> { ["AUS3438"] = "3440x1440" };
+
+        vm.HydrateHardwareContext(
+            displays,
+            audioEndpoints: [],
+            customNames: new Dictionary<string, string>(),
+            cachedNames: new Dictionary<string, string> { ["AUS3438"] = "VG34VQL3A" },
+            blacklistedIds: [],
+            cachedResolutions: cachedResolutions);
+
+        // Canvas item must be upgraded to native 3440x1440
+        Assert.Equal(3440, vm.StageMonitors[0].Width);
+        Assert.Equal(1440, vm.StageMonitors[0].Height);
+
+        // Applying to preset must persist the upgraded resolution
+        var target = new WorkstationPreset();
+        vm.ApplyTo(target);
+        Assert.Equal(3440, target.MonitorPlacements[0].Width);
+        Assert.Equal(1440, target.MonitorPlacements[0].Height);
+    }
+
+    [Fact]
+    public void PresetConfigurationItemViewModel_AddableAudioOptions_IncludesDisconnectedEndpointsWithLabel()
+    {
+        var preset = new WorkstationPreset
+        {
+            Name = "Sim Rig",
+            AudioPriorityIds = []
+        };
+
+        var vm = new PresetConfigurationItemViewModel(preset, 0, "RigGroup", true);
+
+        var endpoints = new List<AudioEndpointInfo>
+        {
+            new("{ACTIVE-SPEAKER}", "Speakers (Active USB)", "Realtek", DevicePresenceState.Active, false, false, AudioDeviceFlow.Playback),
+            new("{MONITOR-AUDIO}", "VG34VQL3A (NVIDIA High Definition Audio)", "NVIDIA", DevicePresenceState.NotPresent, false, false, AudioDeviceFlow.Playback)
+        };
+
+        vm.HydrateHardwareContext(
+            displays: [],
+            audioEndpoints: endpoints,
+            customNames: new Dictionary<string, string>(),
+            cachedNames: new Dictionary<string, string>(),
+            blacklistedIds: []);
+
+        Assert.Equal(2, vm.AddableAudioOptions.Count);
+        // Active device first
+        Assert.Equal("{ACTIVE-SPEAKER}", vm.AddableAudioOptions[0].Id);
+        Assert.DoesNotContain("(Disconnected)", vm.AddableAudioOptions[0].DisplayName);
+
+        // Disconnected device second with label
+        Assert.Equal("{MONITOR-AUDIO}", vm.AddableAudioOptions[1].Id);
+        Assert.Contains("(Disconnected)", vm.AddableAudioOptions[1].DisplayName);
+    }
 }

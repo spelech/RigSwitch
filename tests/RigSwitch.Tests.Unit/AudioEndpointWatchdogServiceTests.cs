@@ -283,5 +283,105 @@ public sealed class AudioEndpointWatchdogServiceTests
         await _director.DidNotReceive().SetDefaultPlaybackEndpointAsync("{PEBBLE-USB}", Arg.Any<CancellationToken>());
         await _director.Received(1).SetDefaultPlaybackEndpointAsync("{MONITOR-OLED}", Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task WhenProfileSwitchInProgress_WatchdogSuppressesReassertion()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{SHAKER-DAC}"],
+            DeskPresets = [new WorkstationPreset { PrimaryAudioId = "{SPEAKERS}" }]
+        };
+        _storage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+
+        using var watchdog = new AudioEndpointWatchdogService(_provider, _director, _storage);
+        watchdog.Start();
+        watchdog.BeginProfileSwitch();
+
+        _provider.DefaultDeviceChanged += Raise.Event<Action<EDataFlow, ERole, string>>(
+            EDataFlow.eRender, ERole.eConsole, "{SHAKER-DAC}");
+
+        await Task.Delay(350);
+
+        await _director.DidNotReceiveWithAnyArgs().SetDefaultPlaybackEndpointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        watchdog.EndProfileSwitch();
+    }
+
+    [Fact]
+    public async Task WhenDefaultSwitchesToBlacklistedDevice_AndGuidShifted_MatchesByFriendlyName()
+    {
+        var settings = new UserSettings
+        {
+            BlacklistedAudioEndpointIds = ["{SHAKER-DAC}"],
+            CachedDeviceNames = new Dictionary<string, string>
+            {
+                ["{OLD-VG34}"] = "VG34VQL3A (NVIDIA High Definition Audio)"
+            },
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    AudioPriorityIds = ["{OLD-VG34}"]
+                }
+            ]
+        };
+        _storage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _provider.EnumerateRenderEndpoints().Returns(
+        [
+            new AudioEndpointInfo("{NEW-VG34}", "VG34VQL3A (NVIDIA High Definition Audio)", "NVIDIA", DevicePresenceState.Active, false, false),
+            new AudioEndpointInfo("{SHAKER-DAC}", "Chassis - Fosi BST-1", "USB Audio Adapter", DevicePresenceState.Active, true, false)
+        ]);
+
+        using var watchdog = new AudioEndpointWatchdogService(_provider, _director, _storage);
+        watchdog.Start();
+
+        _provider.DefaultDeviceChanged += Raise.Event<Action<EDataFlow, ERole, string>>(
+            EDataFlow.eRender, ERole.eConsole, "{SHAKER-DAC}");
+
+        for (var i = 0; i < 100 && !_director.ReceivedCalls().Any(); i++)
+        {
+            await Task.Delay(50);
+        }
+
+        await _director.Received(1).SetDefaultPlaybackEndpointAsync("{NEW-VG34}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WhenDeviceStateChangedToActive_AndEnforcePrimaryEnabled_WatchdogAssertsPreferredEndpoint()
+    {
+        var settings = new UserSettings
+        {
+            EnforcePrimaryAudio = true,
+            ActiveAudioOutputMode = AudioOutputMode.Primary,
+            DeskPresets =
+            [
+                new WorkstationPreset
+                {
+                    PrimaryAudioId = "{DESIRED-MONITOR}"
+                }
+            ]
+        };
+        _storage.LoadSettingsAsync(Arg.Any<CancellationToken>()).Returns(settings);
+        _provider.EnumerateRenderEndpoints().Returns(
+        [
+            new AudioEndpointInfo("{DESIRED-MONITOR}", "Monitor Audio", "NVIDIA", DevicePresenceState.Active, false, false),
+            new AudioEndpointInfo("{OTHER-DEVICE}", "Headphones", "USB", DevicePresenceState.Active, true, false)
+        ]);
+
+        using var watchdog = new AudioEndpointWatchdogService(_provider, _director, _storage);
+        watchdog.Start();
+
+        // Device arrives / powers on
+        _provider.DeviceStateChanged += Raise.Event<Action<string, DevicePresenceState>>(
+            "{DESIRED-MONITOR}", DevicePresenceState.Active);
+
+        for (var i = 0; i < 100 && !_director.ReceivedCalls().Any(); i++)
+        {
+            await Task.Delay(50);
+        }
+
+        await _director.Received(1).SetDefaultPlaybackEndpointAsync("{DESIRED-MONITOR}", Arg.Any<CancellationToken>());
+    }
 }
 

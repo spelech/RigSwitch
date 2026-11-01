@@ -1352,8 +1352,8 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock Text="CoreAudio Watchdog &amp; Ranked Audio Enforcement" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                        <TextBlock Text="Event-driven CoreAudio session monitor that automatically re-asserts your highest-ranked online audio device if background software (e.g. SteelSeries Sonar or VR drivers) hijacks output." FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                        <TextBlock Text="Continuous Background Audio Enforcement" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="When off (recommended), audio routes to your preferred device upon profile or preset switch and then remains hands-off. When on, RigSwitch continuously reverts any unauthorized background audio hijackings." FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <CheckBox Grid.Column="1"
                                               Style="{StaticResource FluentToggleSwitch}"
